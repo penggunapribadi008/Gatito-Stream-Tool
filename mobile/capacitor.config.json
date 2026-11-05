@@ -1,0 +1,7 @@
+{
+  "appId": "com.streamdeckhp.app",
+  "appName": "Gatito: Stream Tool",
+  "webDir": "www",
+  "backgroundColor": "#0e0f12",
+  "server": { "androidScheme": "http", "cleartext": true }
+}

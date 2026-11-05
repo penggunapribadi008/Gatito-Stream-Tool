@@ -1,0 +1,216 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>
+<script>
+// Mesin suara Gatito (jendela tersembunyi). Cara kerjanya sama seperti Soundpad:
+//  1. Suara tombol + mic aslimu dicampur, lalu dikirim ke "kabel virtual" (CABLE Input).
+//     Discord/Roblox memakai ujung satunya (CABLE Output) sebagai mikrofon, jadi teman ikut mendengar.
+//  2. Suara tombol yang sama juga diputar ke headset/speaker pilihanmu supaya kamu tetap mendengar.
+const isVirt = (l) => /vb-audio|vb-output|cable[\s\w-]*(input|output)|voicemeeter/i.test(l || '');
+const strip = (l) => String(l || '').replace(/^(Default|Communications) - /i, '');
+const special = (d) => d.deviceId === 'default' || d.deviceId === 'communications';
+const msg = (e) => (e && (e.message || e.name)) || String(e);
+const DEF = { virt: { id: '', label: '' }, mon: { id: 'default', label: '' }, mic: { id: '', label: '' }, vVol: 100, mVol: 100, micVol: 100 };
+const find = (list, p) => (p && (p.id || p.label) && ((p.id && list.find((d) => d.deviceId === p.id)) || (p.label && list.find((d) => strip(d.label) === strip(p.label))))) || null;
+const autoCable = (outs) => outs.find((d) => /^CABLE Input/i.test(d.label)) || outs.find((d) => /cable[\s\w-]*input/i.test(d.label)) || outs.find((d) => isVirt(d.label)) || null;
+
+let cfg = null, lastSig = '', devSig = '', permErr = '';
+let devs = { out: [], inp: [] };
+let cV = null, cM = null, sendV = null, sendM = null, busV = null, busM = null, mic = null;
+let info = { cableFound: false, cable: '', mon: '', mic: '', micId: '', errs: [], warns: [] };
+const cache = new Map(), live = new Map(), gen = {};
+
+async function listDevices() {
+  const md = navigator.mediaDevices;
+  let l = await md.enumerateDevices();
+  // Nama perangkat baru terbaca setelah izin mic diberikan sekali
+  if (l.some((d) => d.kind !== 'videoinput' && !d.label)) {
+    try { (await md.getUserMedia({ audio: true })).getTracks().forEach((t) => t.stop()); l = await md.enumerateDevices(); permErr = ''; }
+    catch (e) { permErr = e.name || 'error'; }
+  }
+  devs.out = l.filter((d) => d.kind === 'audiooutput');
+  devs.inp = l.filter((d) => d.kind === 'audioinput');
+  devSig = l.filter((d) => d.kind !== 'videoinput').map((d) => d.kind + d.deviceId + d.label).join('|');
+}
+
+async function mk(id) {
+  const ctx = new AudioContext({ latencyHint: 'interactive' });
+  try { await ctx.setSinkId(id || ''); } catch (e) { ctx.close().catch(() => {}); throw e; }
+  await ctx.resume().catch(() => {});
+  return ctx;
+}
+// Bus keluaran: gain -> limiter (mencegah suara pecah saat mic + suara tombol ditumpuk) -> perangkat
+function mkBus(ctx) {
+  const g = ctx.createGain(), lim = ctx.createDynamicsCompressor(), an = ctx.createAnalyser();
+  lim.threshold.value = -3; lim.knee.value = 0; lim.ratio.value = 20; lim.attack.value = 0.002; lim.release.value = 0.1;
+  an.fftSize = 1024;
+  g.connect(lim); lim.connect(ctx.destination); lim.connect(an);
+  return { g, an };
+}
+function setGains(c) {
+  if (sendV) sendV.gain.value = c.vVol / 100;
+  if (sendM) sendM.gain.value = c.mVol / 100;
+  if (mic) mic.g.gain.value = c.micVol / 100;
+}
+function teardown() {
+  Object.keys(gen).forEach((k) => gen[k]++);
+  live.forEach((set) => set.forEach((o) => { try { o.s.stop(); } catch (e) {} }));
+  live.clear();
+  if (mic) { mic.stream.getTracks().forEach((t) => t.stop()); mic = null; }
+  [cV, cM].forEach((c) => c && c.close().catch(() => {}));
+  cV = cM = sendV = sendM = busV = busM = null;
+}
+
+function pickMon(c, outs, v) {
+  if (c.mon.id === 'off') return null;
+  const defO = devs.out.find((d) => d.deviceId === 'default');
+  let d = c.mon.id && c.mon.id !== 'default' ? find(outs, c.mon) : null;
+  if (c.mon.id && c.mon.id !== 'default' && !d) info.warns.push('Perangkat headset yang tersimpan tidak ditemukan, sementara memakai Default Windows.');
+  const label = d ? d.label : (defO ? strip(defO.label) : 'Default Windows');
+  if (isVirt(label) || (v && strip(label) === strip(v.label))) {
+    info.warns.push(`Output yang kamu dengar sekarang adalah "${strip(label)}" (kabel virtual), makanya kamu tidak mendengar apa-apa. Pilih headset atau speaker aslimu di menu "Aku mendengar lewat", atau ganti Default output di pengaturan suara Windows.`);
+    return null;
+  }
+  info.mon = label;
+  return { id: d ? d.deviceId : '' };
+}
+
+async function buildMic(c) {
+  if (c.mic.id === 'off') { info.mic = 'Mati'; return; }
+  const ins = devs.inp.filter((d) => !special(d) && !isVirt(d.label));
+  const explicit = !!(c.mic.id || c.mic.label);
+  let d = explicit ? find(ins, c.mic) : null;
+  if (explicit && !d) info.warns.push('Mic yang tersimpan tidak ditemukan, sementara dipilih otomatis.');
+  if (d) info.micId = d.deviceId;
+  if (!d) {
+    // Default Windows boleh berupa Virtual Mic (VB-Cable). Mic itu tidak boleh dipakai di sini (akan berdengung), jadi ambil mic asli.
+    const def = devs.inp.find((x) => x.deviceId === 'default');
+    d = def && !isVirt(def.label) ? def : ins[0] || null;
+  }
+  if (!d) { info.mic = 'Belum dipilih'; info.errs.push('Tidak ada mikrofon asli yang terdeteksi.'); return; }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: { deviceId: { exact: d.deviceId }, echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+    const src = cV.createMediaStreamSource(stream), g = cV.createGain(), an = cV.createAnalyser();
+    an.fftSize = 1024;
+    g.gain.value = c.micVol / 100;
+    src.connect(g); g.connect(busV.g); g.connect(an);
+    mic = { stream, src, g, an };
+    info.mic = strip(d.label);
+  } catch (e) {
+    info.mic = 'Gagal';
+    info.errs.push(`Mic tidak bisa dibuka (${msg(e)}). Cek Pengaturan Windows > Privasi > Mikrofon, aktifkan "Izinkan aplikasi desktop mengakses mikrofon".`);
+  }
+}
+
+async function build(force) {
+  const c = cfg || DEF;
+  const sig = JSON.stringify([c.virt, c.mon, c.mic]);
+  if (!force && sig === lastSig && (cV || cM)) return setGains(c);
+  lastSig = sig;
+  teardown();
+  info = { cableFound: false, cable: '', mon: '', mic: '', micId: '', errs: [], warns: [] };
+  try { await listDevices(); } catch (e) { info.errs.push('Gagal membaca daftar perangkat suara: ' + msg(e)); return; }
+  const outs = devs.out.filter((d) => !special(d));
+
+  // 1) Jalur ke teman: kabel virtual
+  let v = null;
+  if (c.virt.id !== 'none') v = find(outs, c.virt) || autoCable(outs);
+  if (v) {
+    try {
+      cV = await mk(v.deviceId);
+      busV = mkBus(cV); sendV = cV.createGain(); sendV.connect(busV.g);
+      info.cableFound = true; info.cable = v.label;
+    } catch (e) { cV = null; info.errs.push(`Gagal membuka "${v.label}": ${msg(e)}`); v = null; }
+  }
+
+  // 2) Jalur ke headset/speaker kamu
+  const m = pickMon(c, outs, v);
+  if (m) {
+    try { cM = await mk(m.id); busM = mkBus(cM); sendM = cM.createGain(); sendM.connect(busM.g); }
+    catch (e) { cM = null; info.errs.push('Gagal membuka headset/speaker: ' + msg(e)); }
+  }
+  // Cadangan terakhir: kalau semuanya gagal, tetap putar ke output default supaya tombol tidak bisu
+  if (!cV && !cM && c.mon.id !== 'off') {
+    try { cM = await mk(''); busM = mkBus(cM); sendM = cM.createGain(); sendM.connect(busM.g); } catch (e) {}
+  }
+
+  // 3) Mic asli ikut dicampur ke kabel (supaya suaramu tetap terdengar teman)
+  if (cV) await buildMic(c); else info.mic = 'Tidak dipakai (kabel virtual tidak ada)';
+  setGains(c);
+}
+
+let applying = fetch('/audio/settings').then((r) => r.json()).then((c) => { cfg = c; }).catch(() => {}).then(() => build(true)).catch((e) => { info.errs.push(msg(e)); });
+window.sdapply = (c, force) => {
+  if (c) cfg = c;
+  applying = applying.then(() => build(force)).catch((e) => { info.errs.push(msg(e)); });
+  return applying;
+};
+navigator.mediaDevices.addEventListener('devicechange', () => {
+  clearTimeout(window.__dc);
+  window.__dc = setTimeout(async () => {
+    try {
+      const l = await navigator.mediaDevices.enumerateDevices();
+      const s = l.filter((d) => d.kind !== 'videoinput').map((d) => d.kind + d.deviceId + d.label).join('|');
+      if (s !== devSig) window.sdapply(null, true);
+    } catch (e) {}
+  }, 800);
+});
+
+// ---- Memutar ----
+const MAXB = 256 * 1024 * 1024;
+async function load(url) {
+  const hit = cache.get(url);
+  if (hit) { hit.t = Date.now(); return hit.buf; }
+  const r = await fetch(url);
+  if (!r.ok) throw new Error('file tidak ditemukan');
+  const buf = await (cV || cM).decodeAudioData(await r.arrayBuffer());
+  cache.set(url, { buf, t: Date.now(), bytes: buf.length * buf.numberOfChannels * 4 });
+  let tot = 0; cache.forEach((e) => (tot += e.bytes));
+  [...cache.entries()].sort((a, b) => a[1].t - b[1].t).forEach(([k, e]) => { if (tot > MAXB && k !== url) { cache.delete(k); tot -= e.bytes; } });
+  return buf;
+}
+function startOn(ctx, send, buf, vol, set) {
+  const s = ctx.createBufferSource(), g = ctx.createGain(), o = { s, g, ctx };
+  s.buffer = buf; g.gain.value = vol; s.connect(g); g.connect(send); s.start();
+  s.onended = () => { try { g.disconnect(); } catch (e) {} set.delete(o); };
+  return o;
+}
+function stopId(id) {
+  const set = live.get(id); if (!set) return;
+  live.delete(id);
+  set.forEach((o) => { try { o.s.onended = null; o.g.gain.setTargetAtTime(0, o.ctx.currentTime, 0.008); o.s.stop(o.ctx.currentTime + 0.05); } catch (e) {} });
+}
+async function go(id, getBuf, vol) {
+  const my = (gen[id] = (gen[id] || 0) + 1);
+  stopId(id);
+  try {
+    await applying;
+    const buf = await getBuf();
+    if (gen[id] !== my) return; // tombol ditekan lagi atau dihentikan saat file dimuat
+    const set = new Set(); live.set(id, set);
+    if (cV) { cV.resume().catch(() => {}); set.add(startOn(cV, sendV, buf, vol, set)); }
+    if (cM) { cM.resume().catch(() => {}); set.add(startOn(cM, sendM, buf, vol, set)); }
+  } catch (e) { info.errs.push('Gagal memutar: ' + msg(e)); }
+}
+// Dipanggil dari main.js; namanya sama seperti versi lama
+window.sdplay = (id, url, vol) => go(id, () => load(url), vol);
+window.sdstop = () => { Object.keys(gen).forEach((k) => gen[k]++); [...live.keys()].forEach(stopId); };
+window.sdtest = async () => {
+  await applying;
+  const ctx = cV || cM; if (!ctx) return;
+  const sr = 48000, n = Math.floor(sr * 0.8), b = ctx.createBuffer(1, n, sr), d = b.getChannelData(0);
+  for (let i = 0; i < n; i++) { const t = i / sr, tt = t % 0.4, f = t < 0.4 ? 523.25 : 783.99; d[i] = 0.5 * Math.sin(2 * Math.PI * f * tt) * Math.min(1, tt / 0.01) * Math.exp(-tt * 4); }
+  return go('test', async () => b, 0.9);
+};
+
+// ---- Info untuk jendela pengaturan ----
+const lv = { mic: 0, out: 0 }, tb = new Float32Array(1024);
+const peak = (an) => { if (!an) return 0; an.getFloatTimeDomainData(tb); let p = 0; for (let i = 0; i < tb.length; i++) { const x = Math.abs(tb[i]); if (x > p) p = x; } return p; };
+setInterval(() => { lv.mic = Math.max(peak(mic && mic.an), lv.mic * 0.85); lv.out = Math.max(peak(busV && busV.an), lv.out * 0.85); }, 50);
+window.sdLevel = () => lv;
+window.sdInfo = async () => {
+  await applying;
+  const m = (d) => ({ id: d.deviceId, label: d.label || '(tanpa nama)', v: isVirt(d.label) });
+  const dO = devs.out.find((x) => x.deviceId === 'default'), dI = devs.inp.find((x) => x.deviceId === 'default');
+  return { cableFound: info.cableFound, cable: info.cable, mon: info.mon, mic: info.mic, micId: info.micId, defInVirt: !!(dI && isVirt(dI.label)), errs: info.errs.slice(-5), warns: info.warns, permErr,
+    defOut: dO ? strip(dO.label) : '', defIn: dI ? strip(dI.label) : '', out: devs.out.filter((d) => !special(d)).map(m), inp: devs.inp.filter((d) => !special(d)).map(m) };
+};
+</script></body></html>

@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="id"><head><meta charset="utf-8"><title>Gatito: Stream Tool</title>
+<style>
+*{box-sizing:border-box}[hidden]{display:none!important}html,body{margin:0;height:100%;background:#1e1f22;color:#e8e9ed;font:14px "Segoe UI",system-ui,sans-serif}
+body{display:grid;grid-template-columns:1fr 280px}
+#main{display:flex;flex-direction:column;min-width:0;min-height:0}
+#top{padding:16px 24px 4px;display:flex;justify-content:space-between;align-items:center}#top h1{margin:0;font-size:22px}
+.hb{height:40px;padding:0 14px;border:0;border-radius:10px;background:#2d2e31;color:#e8e9ed;cursor:pointer;font:inherit}
+.hb.sq,#gear{width:40px;height:40px;padding:0;border:0;border-radius:10px;background:#2d2e31;color:#e8e9ed;cursor:pointer;display:flex;align-items:center;justify-content:center}.hb.sq:hover,#gear:hover{background:#383a3f}
+#stage{flex:1;display:flex;flex-direction:column;align-items:center;padding:14px;min-height:0;overflow:auto}
+#grid{display:grid;gap:10px;margin-top:auto}
+.k{position:relative;isolation:isolate;width:78px;height:78px;border-radius:14px;background:#141518;border:2px solid #34363d;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;color:#fff;overflow:hidden}
+.k.on{border-color:transparent;background:var(--c)}.k.sel{outline:3px solid #7da2ff;outline-offset:2px}.k.over{border-color:#7da2ff}
+.k .l{position:relative;z-index:1;font-size:12px;font-weight:700;text-align:center;line-height:1.15;padding:0 4px}
+.k.im{background-size:cover;background-position:center;justify-content:flex-end}.k.im .l{width:100%;background:rgba(0,0,0,.55);padding:3px;font-size:9px}
+.k.pv{width:64px;height:64px}.k.pv .l{font-size:12px}.k.pv.im .l{font-size:10px}
+.k.crt::after{content:"";position:absolute;inset:0;pointer-events:none;border-radius:inherit;background:repeating-linear-gradient(0deg,rgba(0,0,0,.35) 0 1px,transparent 1px 3px),radial-gradient(ellipse at center,transparent 55%,rgba(0,0,0,.55) 100%)}
+.k.crt.im{filter:contrast(1.2) saturate(1.35)}
+.vk{min-width:44px;height:30px;border:0;border-radius:6px;background:#34363d;color:#e8e9ed;cursor:pointer}.vk.act{background:#4f6df5;color:#fff}
+#trash{width:32px;height:32px;border:0;border-radius:8px;background:transparent;color:#c9ccd6;cursor:pointer;display:flex;align-items:center;justify-content:center}#trash:hover{background:#3a2a2e;color:#ff7a8a}
+#tabs{display:flex;gap:6px;margin:14px 0 auto;align-items:center}
+#tabs button{min-width:36px;height:30px;border:0;border-radius:15px;background:#2d2e31;color:#c9ccd6;cursor:pointer}#tabs button.act{background:#e8e9ed;color:#1e1f22}#tabs button.over{background:#4f6df5;color:#fff}#tabs button.del{width:30px;min-width:30px;padding:0;display:flex;align-items:center;justify-content:center;border-radius:15px}#toast{position:fixed;left:50%;bottom:210px;transform:translateX(-50%);background:#34363d;color:#e8e9ed;padding:8px 14px;border-radius:10px;z-index:400;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none}#toast.on{opacity:1}
+#panel{position:relative;border-top:1px solid #34363d;padding:8px 24px 8px;height:190px;flex:none;overflow-y:auto;background:#232428}
+.ph{display:flex;justify-content:space-between;align-items:center;padding-bottom:4px;margin-bottom:8px;border-bottom:1px solid #34363d}
+.pt{font-weight:600;font-size:14px}
+input:focus,select:focus,button:focus,input:focus-visible,select:focus-visible,button:focus-visible{outline:none}
+input:focus,select:focus{border-color:#5b6070}
+*{scrollbar-width:thin;scrollbar-color:#3c3f48 transparent}
+#stage,#side,#panel{scrollbar-width:none}
+#profrow{display:flex;gap:6px;margin-top:8px;align-items:center}#profrow select{height:30px;padding:0 8px;max-width:190px}
+.sb{height:30px;padding:0 10px;border:0;border-radius:8px;background:#2d2e31;color:#e8e9ed;cursor:pointer;font:inherit;font-size:12px}.sb.sq{width:30px;padding:0;display:flex;align-items:center;justify-content:center}.sb.sq:hover{background:#383a3f}#pdel:hover,#tabs button.del:hover{background:#3a2a2e;color:#ff7a8a}
+.ov{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center}.ov[hidden]{display:none}
+.pform{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
+#panel input,#panel select{padding:6px 8px}
+#panel label{gap:3px}
+.dd.vk{max-height:187px}
+.k .l:empty{display:none}
+.pvcol{display:flex;flex-direction:column;gap:8px;width:72px}
+.ib{padding:0;width:34px;height:34px;display:flex;align-items:center;justify-content:center}
+.b:disabled{opacity:.4;cursor:default}
+.dd{position:absolute;top:100%;left:0;width:100%;max-height:170px;overflow-y:auto;background:#2d2e31;border:1px solid #3c3f48;border-radius:8px;margin-top:4px;z-index:5}
+.dd[hidden]{display:none}
+.ddi{display:flex;align-items:center;gap:8px;padding:0 10px;height:34px;cursor:pointer;color:#e8e9ed;font-size:13px}.ddi span{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.ddi img{flex:none}
+.ddi:hover{background:#3d4048}
+#side{background:#262729;border-left:1px solid #34363d;overflow:auto}
+.g{padding:10px 14px;font-weight:700;background:#2d2e31}
+.it{padding:10px 14px 10px 24px;cursor:grab;color:#c9ccd6}.it:hover{background:#34363b}
+label{display:grid;gap:4px;font-size:12px;color:#8b90a0}
+input,select{background:#141518;border:1px solid #3c3f48;color:#e8e9ed;border-radius:8px;padding:8px;font:inherit}
+input[type=color]{padding:2px;height:36px;width:60px}
+input[type=range]{--pf:0;-webkit-appearance:none;appearance:none;height:22px;padding:0;border:0;background:transparent;cursor:pointer;min-width:0}
+input[type=range]::-webkit-slider-runnable-track{height:6px;border-radius:3px;background:linear-gradient(to right,#4f6df5 calc(7px + (100% - 14px) * var(--pf)),#3c3f48 calc(7px + (100% - 14px) * var(--pf)))}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;margin-top:-4px;border-radius:50%;background:#fff;border:0;box-shadow:0 1px 3px rgba(0,0,0,.5)}
+input[type=range]:hover::-webkit-slider-thumb{background:#dfe5ff}
+.row{display:flex;gap:16px;row-gap:14px;flex-wrap:wrap;align-items:end}
+.b{background:#34363d;color:#e8e9ed;border:0;border-radius:8px;padding:9px 12px;cursor:pointer}
+#modal{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center}#modal[hidden]{display:none}
+.mbox{background:#262729;border-radius:16px;padding:24px;width:380px;text-align:center}
+.mbox h2{margin:0 0 12px}.mbox img{background:#fff;border-radius:10px;width:230px;height:230px}
+.mbox ol{text-align:left;color:#c9ccd6;line-height:1.7;padding-left:22px}.mbox small{color:#8b90a0;display:block;margin:8px 0 14px}
+.rec{color:#c9ccd6}
+#ddp{position:fixed;z-index:300;background:#2d2e31;border:1px solid #3c3f48;border-radius:8px;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,.5)}#ddp[hidden]{display:none}
+#ddl{height:100%;overflow-y:auto}.dde{color:#8b90a0;padding:10px}
+#ddv{height:100%;padding:8px 10px}#ddv .seg{margin:0 auto 10px}
+#ddg{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;max-height:150px;overflow-y:auto;scrollbar-width:none}
+#ddg button,#vg button{height:36px;border:0;border-radius:8px;background:#34363d;color:#e8e9ed;font:inherit;font-weight:600;cursor:pointer}#ddg button:hover,#vg button:hover:not(:disabled){background:#4f6df5}
+.seg{display:flex;gap:2px;background:#1e1f22;border-radius:8px;padding:2px;width:max-content}.seg button{min-width:44px;height:26px;padding:0 10px;border:0;border-radius:6px;background:transparent;color:#8b90a0;font:inherit;font-weight:700;cursor:pointer}.seg button.on{background:#4f6df5;color:#fff}
+#vg{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;max-height:210px;overflow-y:auto;scrollbar-width:thin}#vg button{height:40px}#vg button:disabled{opacity:.45;cursor:default}
+#vul{max-height:250px;overflow-y:auto}.ur{display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid #2d2e31}.ur .f{width:42px;font-weight:700}.ur .k{width:40px;height:40px;border-radius:9px;border:1px solid #34363d;flex:none;background-size:cover;background-position:center}.ur .n{flex:1;min-width:0}.ur .n small{display:block;color:#8b90a0}
+.pa{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap}.pp{width:68px;background:transparent;color:inherit;font:inherit;font-weight:700;border:0;border-bottom:1px dashed #6b7080;outline:0;padding:0 0 0 2px;-moz-appearance:textfield}.pp:focus{border-bottom-color:#4f6df5}.pp::-webkit-inner-spin-button,.pp::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+.pm{min-height:18px;margin-top:8px;font-size:12.5px;line-height:1.45;text-align:left;color:#8b90a0}.pm.ok{color:#6fd08c}.pm.no{color:#ff8a80}
+.hr{display:flex;gap:12px;padding:6px 0;border-bottom:1px solid #3c3f48;font-size:13px}.hr b{min-width:56px;font-variant-numeric:tabular-nums}.hr span{color:#8b90a0}
+.mf{display:flex;justify-content:space-between;gap:12px;padding:9px 12px;background:#2d2e31;border-radius:8px;margin-top:6px;text-align:left}.mf span{color:#8b90a0}.mf b{user-select:text;word-break:break-all;text-align:right}#abody label{margin-top:10px}#abody select{width:100%}.sl{display:flex;gap:8px;align-items:center}.sl input{flex:1}.sl span{width:38px;text-align:right;color:#c9ccd6;font-size:12px}
+.ag{display:grid;grid-template-columns:1fr 1fr;gap:12px 16px;margin-top:12px}.ag label{min-width:0}.ag select{width:100%;min-width:0;text-overflow:ellipsis}.lt{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.mut{color:#8b90a0}
+.mbox .stp{list-style:none;counter-reset:s;margin:4px 0 8px;padding:0;display:grid;gap:7px}.stp li{counter-increment:s;display:flex;gap:10px;align-items:flex-start;color:#c9ccd6;font-size:13px;line-height:1.4}.stp li::before{content:counter(s);flex:none;width:20px;height:20px;border-radius:50%;background:#34363d;color:#e8e9ed;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.orow{display:flex;gap:16px;flex-wrap:wrap}
+.mt{height:8px;background:#2d2e31;border-radius:4px;overflow:hidden;margin-top:3px}.mt i{display:block;height:100%;width:0;background:#46c27d;transition:width .08s}
+</style></head><body>
+<div id="main"><div id="top"><div><h1>Gatito: Stream Tool</h1><div id="profrow"><select id="prof"></select><button class="sb sq" id="pnew" title="Profil baru" aria-label="Profil baru">+</button><button class="sb sq" id="pren" title="Ubah nama profil" aria-label="Ubah nama profil"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button><button class="sb sq" id="pdel" title="Hapus profil" aria-label="Hapus profil"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/><path d="M10 11v6M14 11v6"/></svg></button></div></div><div style="display:flex;gap:8px"><button id="au" class="hb sq" title="Suara" aria-label="Suara"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M9 21h6"/></svg></button><button id="ob" class="hb sq" title="OBS" aria-label="OBS"><svg width="22" height="22" viewBox="0 0 24 24"><defs><mask id="obsm"><rect width="24" height="24" fill="#fff"/><g fill="none" stroke="#000" stroke-width="2.1" stroke-linecap="round"><path d="M12.00 9.40Q17.05 5.54 22.81 8.07"/><path d="M14.25 13.30Q15.07 19.60 10.00 23.33"/><path d="M9.75 13.30Q3.88 10.86 3.19 4.61"/></g></mask></defs><circle cx="12" cy="12" r="10.8" fill="currentColor" mask="url(#obsm)"/></svg></button><button id="vp" class="hb sq" title="Tombol virtual" aria-label="Tombol virtual"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2.5"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/></svg></button><button id="gear" title="Sambungkan HP (kode QR)" aria-label="Sambungkan HP"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.2"/><rect x="14" y="3" width="7" height="7" rx="1.2"/><rect x="3" y="14" width="7" height="7" rx="1.2"/><path d="M14 14h3v3h-3zM20 14v3M17 20h4"/></svg></button></div></div>
+<div id="stage"><div id="grid"></div><div id="tabs"></div></div><div id="panel"></div></div>
+<div id="side"></div>
+<datalist id="apps"></datalist>
+<div id="amodal" class="ov" hidden><div class="mbox" style="width:560px;text-align:left;max-height:92vh;display:flex;flex-direction:column">
+<h2 style="font-size:18px;margin-bottom:6px">Suara dan mic virtual</h2>
+<div id="abody" style="overflow-y:auto;min-height:0;flex:1"></div>
+<div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end;flex:none"><button class="b" id="arefresh">Segarkan</button><button class="b" id="atest">Tes suara</button><button class="b" id="aclose" style="background:#4f6df5">Tutup</button></div>
+</div></div>
+<div id="omodal" class="ov" hidden><div class="mbox" style="width:420px;text-align:left">
+<h2 style="font-size:18px;margin-bottom:10px">Pantau OBS di HP</h2>
+<ol class="stp"><li><span>Di OBS buka <b>Tools &gt; WebSocket Server Settings</b></span></li><li><span>Centang <b>Enable WebSocket server</b> (OBS 28 ke atas)</span></li><li><span>Isi password di bawah kalau OBS memakainya</span></li></ol>
+<label style="grid-auto-flow:column;align-items:center;gap:8px;justify-content:start;color:#e8e9ed;font-size:13px;margin-top:8px"><input type="checkbox" id="oon"> Aktifkan pemantauan OBS</label>
+<div style="display:flex;gap:8px;margin-top:8px"><label style="flex:1">Alamat OBS<input id="ohost" placeholder="127.0.0.1"></label><label style="width:96px">Port<input id="oport" type="number" min="1" max="65535" placeholder="4455"></label></div>
+<label style="margin-top:8px">Password OBS<input id="opass" type="password" autocomplete="off"></label>
+<div id="ost" style="margin-top:10px;min-height:20px"></div><div id="oouts" style="max-height:150px;overflow:auto"></div>
+<div style="margin-top:14px;display:flex;gap:8px;justify-content:flex-end"><button class="b" id="osave" style="background:#4f6df5">Simpan</button><button class="b" id="oclose">Tutup</button></div>
+</div></div>
+<div id="pmodal" class="ov" hidden><div class="mbox">
+<h2 style="font-size:18px">Sambungkan HP</h2><img id="qr" alt="Kode QR">
+<ol><li>Buka aplikasi Gatito: Stream Tool di HP</li><li>Tekan <b>Scan QR</b>, arahkan kamera ke kode ini</li></ol>
+<div class="mf"><span>Alamat</span><b id="padr" class="pa"><span id="pips">-</span>:<input id="pport" class="pp" type="number" min="1024" max="65535" inputmode="numeric" title="Port (bisa diubah)"></b></div><div class="mf"><span>PIN</span><b id="ppin">-</b></div>
+<div style="display:flex;gap:8px;margin-top:10px;justify-content:flex-end"><button class="b" id="pavoid">Hindari</button><button class="b" id="psave">Simpan port</button><button class="b" id="prestart" style="background:#4f6df5;display:none">Mulai ulang</button></div>
+<div id="pmsg" class="pm"></div>
+<div style="margin-top:14px;text-align:right"><button class="b" id="pclose" style="background:#4f6df5">Tutup</button></div>
+</div></div>
+<div id="hmodal" class="ov" hidden><div class="mbox" style="width:420px;text-align:left">
+<h2 style="font-size:18px;margin-bottom:6px">Port yang sebaiknya dihindari</h2>
+<p style="margin:0 0 10px;color:#8b90a0;line-height:1.45;font-size:13px">Port ini biasanya sudah dipakai program lain. Kalau dimasukkan, Gatito menolaknya.</p>
+<div id="hlist" style="max-height:260px;overflow:auto"></div>
+<p style="margin:10px 0 0;color:#8b90a0;line-height:1.45;font-size:12px">Port 3000 (bawaan) juga dipakai ChatLivestream Labs dan banyak tool developer. Kalau 3000 sedang terpakai saat Gatito dibuka, Gatito otomatis pindah ke port kosong berikutnya dan memberi tahu kamu. Supaya HP tidak perlu scan ulang, simpan port tetap yang jarang dipakai, misalnya 3456 atau 4600.</p>
+<div style="margin-top:14px;text-align:right"><button class="b" id="hclose" style="background:#4f6df5">Tutup</button></div>
+</div></div>
+<div id="vmodal" class="ov" hidden><div class="mbox" style="width:420px;text-align:left">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h2 style="margin:0;font-size:18px">Tombol virtual</h2><div class="seg" id="vsw"><button data-m="F" class="on">F</button><button data-m="K">K</button><button data-m="U">Terpakai</button></div></div>
+<p id="vhint" style="margin:0 0 10px;color:#8b90a0;line-height:1.45;font-size:13px"></p>
+<div id="vg"></div><div id="vul" hidden></div>
+<div style="margin-top:14px;display:flex;gap:8px;justify-content:space-between;align-items:center"><button class="b" id="vfloat" title="Jendela kecil yang tetap di atas OBS dan mengirim tombol langsung">Mode mengambang</button><button class="b" id="vclose" style="background:#4f6df5">Tutup</button></div>
+</div></div>
+<div id="ddp" hidden></div><div id="toast"></div>
+<div id="nmodal" class="ov" hidden><div class="mbox" style="width:340px;text-align:left"><h2 id="ntitle" style="font-size:18px"></h2><input id="nin" style="width:100%"><div style="margin-top:14px;display:flex;gap:8px;justify-content:flex-end"><button class="b" id="ncancel">Batal</button><button class="b" id="nok" style="background:#4f6df5">Simpan</button></div></div></div>
+<div id="cmodal" class="ov" style="z-index:120" hidden><div class="mbox" style="width:340px;text-align:left"><h2 id="ctitle" style="font-size:18px;margin-bottom:6px"></h2><p id="ctext" style="margin:0;color:#8b90a0;line-height:1.45;font-size:13px"></p><div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end"><button class="b" id="ccancel">Batal</button><button class="b" id="cok" style="background:#d6455d">Hapus</button></div></div></div>
+<script>
+const $ = (id) => document.getElementById(id);
+// Warna isi slider mengikuti posisi: 0 sampai 1
+const pf = (el) => el.style.setProperty('--pf', String((el.value - el.min) / ((el.max - el.min) || 1)));
+let st, page = 0, sel = null, APPS = [], lastCur = -1;
+const ws = new WebSocket('ws://' + location.host + '/ws');
+const send = (m) => ws.readyState === 1 && ws.send(JSON.stringify(m));
+ws.onmessage = (e) => { const m = JSON.parse(e.data); if (m.t === 'state') { st = m.state; if (page >= st.pages.length) page = st.pages.length - 1; if (st.cur !== lastCur) { lastCur = st.cur; page = 0; sel = null; } draw(); } };
+ws.onclose = () => setTimeout(() => location.reload(), 1500);
+const TRASH16 = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/><path d="M10 11v6M14 11v6"/></svg>';
+let tT = 0;
+function toast(t) { const e = $('toast'); e.textContent = t; e.classList.add('on'); clearTimeout(tT); tT = setTimeout(() => e.classList.remove('on'), 2200); }
+// Dialog konfirmasi di dalam aplikasi (pengganti confirm bawaan browser)
+let cRes = null;
+function askConfirm(title, text, okText) {
+  return new Promise((res) => {
+    $('ctitle').textContent = title; $('ctext').textContent = text || ''; $('ctext').hidden = !text; $('cok').textContent = okText || 'Hapus';
+    const done = (v) => { $('cmodal').hidden = true; cRes = null; res(v); };
+    cRes = done; $('cok').onclick = () => done(true); $('ccancel').onclick = () => done(false);
+    $('cmodal').hidden = false; $('cok').focus();
+  });
+}
+$('cmodal').addEventListener('mousedown', (ev) => { if (ev.target === $('cmodal') && cRes) cRes(false); });
+const esc = (s) => String(s || '').replace(/[&"<>]/g, (c) => ({ '&': '&amp;', '"': '&quot;', '<': '&lt;', '>': '&gt;' }[c]));
+fetch('/apps').then((r) => r.json()).then((a) => { APPS = a; $('apps').innerHTML = a.map((x) => `<option value="${esc(x.name)}">`).join(''); });
+
+const DEF = {
+  hotkey: { label: 'Hotkey', color: '#4f6df5', action: 'hotkey', keys: '' },
+  vkey: { label: 'Tombol Virtual', color: '#3a8fb7', action: 'vkey', vk: 'F13' },
+  open: { label: 'Aplikasi', color: '#8a6d3b', action: 'open', target: '' },
+  web: { label: 'Website', color: '#3a8fb7', action: 'web', target: '' },
+  text: { label: 'Teks', color: '#7b5bb5', action: 'text', text: '' },
+  media: { label: 'Media', color: '#3f8f6b', action: 'media', key: 'playpause' },
+  sound: { label: 'Audio', color: '#d6455d', action: 'sound', file: '', vol: '100' },
+  stopsound: { label: 'Stop Audio', color: '#7a3b46', action: 'stopsound' },
+  next: { label: 'Berikutnya', color: '#5c6370', action: 'nav', to: 'next' },
+  prev: { label: 'Sebelumnya', color: '#5c6370', action: 'nav', to: 'prev' }
+};
+const ALLVK = [...Array.from({ length: 12 }, (_, i) => 'F' + (13 + i)), ...Array.from({ length: 36 }, (_, i) => 'K' + (i + 1))];
+function mkDef(id) {
+  const d = Object.assign({}, DEF[id]);
+    if (id === 'vkey') { const used = new Set((st.usedVk || []).map((u) => u.vk)); const v = ALLVK.find((x) => !used.has(x)); if (v) d.vk = v; }
+  return d;
+}
+const TITLES = { hotkey: 'Hotkey', vkey: 'Tombol virtual', open: 'Buka aplikasi', web: 'Buka website', text: 'Ketik teks', media: 'Multimedia', sound: 'Putar audio', stopsound: 'Hentikan audio', nav: 'Navigasi' };
+const LIB = [['Sistem', [['hotkey', 'Hotkey'], ['vkey', 'Tombol virtual (F dan K)'], ['open', 'Buka aplikasi'], ['web', 'Buka website'], ['text', 'Ketik teks'], ['media', 'Multimedia']]],
+  ['Soundboard', [['sound', 'Putar audio'], ['stopsound', 'Hentikan audio']]],
+  ['Navigasi', [['next', 'Halaman berikutnya'], ['prev', 'Halaman sebelumnya']]]];
+$('side').innerHTML = LIB.map(([g, items]) => `<div class="g">${g}</div>` + items.map(([id, n]) => `<div class="it" draggable="true" data-id="${id}">${n}</div>`).join('')).join('');
+document.querySelectorAll('.it').forEach((el) => {
+  el.ondragstart = (e) => e.dataTransfer.setData('text/plain', 'lib:' + el.dataset.id);
+  el.ondblclick = () => { if (sel !== null) send({ t: 'set', p: page, k: sel, key: mkDef(el.dataset.id) }); };
+});
+
+function draw() {
+  if (!$('vmodal').hidden && V.m === 'U') vDraw();
+  fillProf();
+  const g = $('grid'); g.style.gridTemplateColumns = `repeat(${st.cols},78px)`; g.innerHTML = '';
+  const keys = st.pages[page].keys;
+  for (let i = 0; i < st.cols * st.rows; i++) {
+    const k = keys[i], d = document.createElement('div');
+    d.className = 'k' + (k ? ' on' : '') + (k && k.img ? ' im' : '') + (k && k.img && k.crt === '1' ? ' crt' : '') + (i === sel ? ' sel' : '');
+    if (k) {
+      d.style.setProperty('--c', k.color || '#4f6df5');
+      if (k.img) d.style.backgroundImage = `url(${k.img})`;
+      d.innerHTML = `<span class="l">${esc(k.label)}</span>`;
+      d.draggable = true; d.ondragstart = (e) => e.dataTransfer.setData('text/plain', 'key:' + i);
+    }
+    d.onclick = () => { sel = i; draw(); };
+    d.ondragover = (e) => { e.preventDefault(); d.classList.add('over'); };
+    d.ondragleave = () => d.classList.remove('over');
+    d.ondrop = (e) => {
+      e.preventDefault();
+      const [t, v] = e.dataTransfer.getData('text/plain').split(':');
+      if (t === 'lib') send({ t: 'set', p: page, k: i, key: mkDef(v) });
+      else if (t === 'key' && +v !== i) send({ t: 'swap', p: page, a: +v, b: i });
+      sel = i;
+    };
+    g.appendChild(d);
+  }
+  const T = $('tabs'); T.innerHTML = '';
+  st.pages.forEach((_, i) => {
+    const b = document.createElement('button'); b.textContent = i + 1; b.className = i === page ? 'act' : ''; b.onclick = () => { page = i; sel = null; draw(); };
+    // Seret tombol ke nomor halaman untuk memindahkannya ke halaman itu
+    b.ondragover = (e) => { if (i !== page) { e.preventDefault(); b.classList.add('over'); } };
+    b.ondragleave = () => b.classList.remove('over');
+    b.ondrop = (e) => { e.preventDefault(); b.classList.remove('over'); const [t, v] = e.dataTransfer.getData('text/plain').split(':'); if (t === 'key' && i !== page) moveKey(+v, i); };
+    T.appendChild(b);
+  });
+  const a = document.createElement('button'); a.textContent = '+'; a.title = 'Tambah halaman'; a.onclick = () => send({ t: 'addPage' }); T.appendChild(a);
+  if (st.pages.length > 1) { const x = document.createElement('button'); x.className = 'del'; x.title = 'Hapus halaman ini'; x.setAttribute('aria-label', 'Hapus halaman ini'); x.innerHTML = TRASH16; x.onclick = async () => { if (await askConfirm('Hapus halaman ' + (page + 1) + '?', 'Semua tombol di halaman ini ikut terhapus.')) send({ t: 'delPage', p: page }); }; T.appendChild(x); }
+  drawPanel();
+}
+
+function moveKey(k, to) {
+  if (!st.pages[to]) return;
+  if (Object.keys(st.pages[to].keys).length >= st.cols * st.rows) return toast('Halaman ' + (to + 1) + ' sudah penuh');
+  send({ t: 'move', p: page, k, to }); sel = null; toast('Tombol dipindah ke halaman ' + (to + 1));
+}
+
+function drawPanel() {
+  ddClose();
+  const P = $('panel'), k = sel !== null && st.pages[page].keys[sel];
+  if (!k) { P.innerHTML = '<p style="color:#8b90a0;margin:0">Klik sebuah tombol untuk mengaturnya. Seret aksi dari daftar di kanan ke tombol. Seret tombol ke tombol lain untuk menukar posisi, atau ke nomor halaman untuk memindahkannya.</p>'; return; }
+  const f = (n, l, v, a = '') => `<label>${l}<input data-f="${n}" value="${esc(v)}" ${a}></label>`;
+  const sl = (n, l, v, opts) => `<label>${l}<select data-f="${n}">${opts.map(([o, t]) => `<option value="${o}"${o === v ? ' selected' : ''}>${t}</option>`).join('')}</select></label>`;
+  let x = '';
+  if (k.action === 'hotkey') x = f('keys', 'Kombinasi tombol (klik lalu tekan)', k.keys, 'id="hk"');
+  else if (k.action === 'vkey') x = `<label>Tombol virtual<input id="vkin" readonly value="${esc(k.vk)}" style="width:130px;cursor:pointer"></label>`;
+  else if (k.action === 'web') x = f('target', 'Alamat website', k.target, 'style="width:260px" placeholder="contoh: youtube.com"');
+  else if (k.action === 'open') x = `<label>Aplikasi (ketik untuk mencari)<input id="app" autocomplete="off" value="${esc(k.appName || k.target)}" style="width:260px" placeholder="None"></label>`;
+  else if (k.action === 'text') x = f('text', 'Teks yang diketik', k.text);
+  else if (k.action === 'media') x = sl('key', 'Aksi', k.key, [['playpause', 'Play / Pause'], ['next', 'Lagu berikutnya'], ['prev', 'Lagu sebelumnya'], ['volup', 'Volume +'], ['voldown', 'Volume -'], ['mute', 'Mute']]);
+  else if (k.action === 'nav') x = sl('to', 'Pindah ke', k.to, [['next', 'Halaman berikutnya'], ['prev', 'Halaman sebelumnya']]);
+  else if (k.action === 'sound') x = `<label style="flex:1 1 300px">File audio<div class="row" style="gap:8px;flex-wrap:nowrap"><input readonly value="${esc(k.file)}" title="${esc(k.file)}" style="flex:1;min-width:0"><button class="b" id="pa">Pilih file…</button></div></label><label style="width:190px">Volume<div class="sl"><input data-f="vol" type="range" min="0" max="200" value="${esc(k.vol || 80)}"><span>${esc(k.vol || 80)}%</span></div></label>`;
+  const svg = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/><path d="M10 11v6M14 11v6"/></svg>';
+  const up = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4"/><path d="M7 9l5-5 5 5"/><path d="M4 20h16"/></svg>';
+  const crtBox = k.img ? `<label style="grid-auto-flow:column;align-items:center;gap:6px;justify-content:start;color:#e8e9ed;font-size:12px;white-space:nowrap"><input type="checkbox" id="crt"${k.crt === '1' ? ' checked' : ''}> Filter CRT</label>` : '';
+  P.innerHTML = `<div class="ph"><div class="pt">${TITLES[k.action] || 'Tombol'}</div><button id="trash" title="Hapus tombol">${svg}</button></div><div class="row" style="align-items:flex-start;flex-wrap:nowrap"><div class="pvcol"><div id="pv"></div><div class="row" style="gap:4px;flex-wrap:nowrap"><button class="b ib" id="pi" title="Pilih gambar">${up}</button><button class="b ib" id="ri" title="Hapus gambar"${k.img ? '' : ' disabled'}>${svg}</button></div></div><div class="pform"><div class="row">${f('label', 'Nama tombol', k.label)}<label>Warna<input data-f="color" type="color" value="${esc(k.color || '#4f6df5')}"></label>${crtBox}</div>${x ? `<div class="row">${x}</div>` : ''}</div></div>`;
+  const pv = $('pv');
+  pv.className = 'k on pv' + (k.img ? ' im' : '') + (k.img && k.crt === '1' ? ' crt' : '');
+  pv.style.setProperty('--c', k.color || '#4f6df5');
+  if (k.img) pv.style.backgroundImage = `url(${k.img})`;
+  pv.innerHTML = `<span class="l">${esc(k.label)}</span>`;
+  P.querySelectorAll('[data-f]').forEach((el) => el.onchange = () => {
+    if (el.id === 'app') { const m = APPS.find((a) => a.name === el.value); k.target = m ? m.path : el.value; k.appName = m ? m.name : ''; }
+    else k[el.dataset.f] = el.value;
+    send({ t: 'set', p: page, k: sel, key: k });
+  });
+  P.querySelectorAll('input[type=range]').forEach((el) => { pf(el); el.oninput = () => { const s = el.nextElementSibling; if (s) s.textContent = el.value + '%'; pf(el); }; });
+  $('trash').onclick = () => send({ t: 'del', p: page, k: sel });
+  if ($('crt')) $('crt').onchange = () => { k.crt = $('crt').checked ? '1' : '0'; send({ t: 'set', p: page, k: sel, key: k }); };
+  P.querySelectorAll('.vk').forEach((b) => b.onclick = () => { k.vk = b.dataset.v; send({ t: 'set', p: page, k: sel, key: k }); });
+  if ($('tv')) $('tv').onclick = () => {
+    const b = $('tv'); send({ t: 'test', key: { action: 'vkey', vk: k.vk }, delay: 3000 });
+    let n = 3; b.disabled = true; b.textContent = 'Dikirim dalam 3…';
+    const iv = setInterval(() => { n--; if (n > 0) b.textContent = `Dikirim dalam ${n}…`; else { clearInterval(iv); b.textContent = 'Terkirim'; setTimeout(() => { b.disabled = false; b.textContent = `Kirim ${k.vk} dalam 3 detik`; }, 1200); } }, 1000);
+  };
+  $('pi').onclick = async () => { const j = await (await fetch('/pick/image', { method: 'POST' })).json(); if (j.img) { k.img = j.img; k.crt = '1'; send({ t: 'set', p: page, k: sel, key: k }); } };
+  if ($('ri')) $('ri').onclick = () => { delete k.img; send({ t: 'set', p: page, k: sel, key: k }); };
+  if ($('pa')) $('pa').onclick = async () => { const j = await (await fetch('/pick/audio', { method: 'POST' })).json(); if (j.file) { k.file = j.file; send({ t: 'set', p: page, k: sel, key: k }); } };
+  const vkin = $('vkin');
+  if (vkin) {
+    const items = () => {
+      const used = new Set((st.usedVk || []).filter((u) => !(u.pi === st.cur && u.pg === page && u.ki === sel)).map((u) => u.vk));
+      return ALLVK.filter((v) => !used.has(v)).map((v) => ({ k: v, label: v }));
+    };
+    vkin.onclick = () => ddOpen('vk', vkin, items(), String(k.vk || '')[0] === 'K' ? 'K' : 'F');
+    vkin.onblur = ddClose;
+  }
+  const app = $('app');
+  if (app) {
+    const items = () => {
+      const t = app.value.toLowerCase();
+      return [{ k: '-1', label: 'None' }].concat(APPS.map((a, i) => ({ k: String(i), label: a.name, icon: '/icon?i=' + i })).filter((o) => !t || o.label.toLowerCase().includes(t)));
+    };
+    app.onfocus = () => ddOpen('list', app, items());
+    app.oninput = () => ddSet(items());
+    app.onblur = ddClose;
+    app.onchange = () => { if (!APPS.find((a) => a.name === app.value)) { k.target = app.value; k.appName = ''; send({ t: 'set', p: page, k: sel, key: k }); } };
+  }
+  const hk = $('hk');
+  if (hk) hk.addEventListener('keydown', (e) => {
+    if (['Control', 'Shift', 'Alt', 'Meta'].includes(e.key)) return;
+    if (!(e.ctrlKey || e.altKey || /^F\d+$/.test(e.key))) return;
+    e.preventDefault();
+    const sp = { Enter: '{ENTER}', Escape: '{ESC}', Tab: '{TAB}', Backspace: '{BACKSPACE}', Delete: '{DEL}', Home: '{HOME}', End: '{END}', ArrowUp: '{UP}', ArrowDown: '{DOWN}', ArrowLeft: '{LEFT}', ArrowRight: '{RIGHT}', PageUp: '{PGUP}', PageDown: '{PGDN}' };
+    hk.value = (e.ctrlKey ? '^' : '') + (e.shiftKey ? '+' : '') + (e.altKey ? '%' : '') + (/^F\d+$/.test(e.key) ? `{${e.key}}` : (sp[e.key] || (e.key.length === 1 ? e.key.toLowerCase() : '')));
+    hk.dispatchEvent(new Event('change'));
+  });
+}
+
+
+// ---- Dropdown di dalam aplikasi (daftar aplikasi dan pilihan tombol virtual) ----
+const DD = { mode: '', anchor: null, items: [], M: 'F' };
+function ddPos() {
+  if (!DD.anchor) return;
+  const el = $('ddp'), r = DD.anchor.getBoundingClientRect(), vk = DD.mode === 'vk';
+  const w = vk ? 300 : Math.max(r.width, 260);
+  const h = vk ? 215 : Math.min(Math.max(DD.items.length, 1), 5) * 34 + 4;
+  let top = r.bottom + 4;
+  if (top + h > innerHeight - 4) top = Math.max(4, r.top - h - 4);
+  el.style.cssText = `left:${Math.max(4, Math.min(r.left, innerWidth - w - 4))}px;top:${top}px;width:${w}px;height:${h}px`;
+}
+function ddRender() {
+  const el = $('ddp');
+  if (DD.mode === 'list') {
+    el.innerHTML = '<div id="ddl">' + (DD.items.map((o) => `<div class="ddi" data-k="${esc(o.k)}">${o.icon ? `<img src="${esc(o.icon)}" width="20" height="20" onerror="this.style.visibility='hidden'">` : '<span style="width:20px;flex:none"></span>'}<span>${esc(o.label)}</span></div>`).join('') || '<div class="dde">Tidak ditemukan</div>') + '</div>';
+  } else {
+    const list = DD.items.filter((o) => String(o.k)[0] === DD.M);
+    el.innerHTML = `<div id="ddv"><div class="seg"><button data-m="F" class="${DD.M === 'F' ? 'on' : ''}">F</button><button data-m="K" class="${DD.M === 'K' ? 'on' : ''}">K</button></div><div id="ddg">${list.map((o) => `<button data-k="${esc(o.k)}">${esc(o.label)}</button>`).join('') || `<div class="dde" style="grid-column:1/-1">Semua tombol ${DD.M} sudah terpakai</div>`}</div></div>`;
+  }
+}
+function ddOpen(mode, anchor, items, M) { DD.mode = mode; DD.anchor = anchor; DD.items = items; if (M) DD.M = M; ddRender(); $('ddp').hidden = false; ddPos(); }
+function ddSet(items) { if ($('ddp').hidden) return; DD.items = items; ddRender(); ddPos(); }
+function ddClose() { $('ddp').hidden = true; DD.anchor = null; }
+$('ddp').addEventListener('mousedown', (ev) => {
+  ev.preventDefault(); // fokus tetap di kotak input, jadi daftar tidak tertutup sebelum item diklik
+  const m = ev.target.closest('[data-m]'); if (m) { DD.M = m.dataset.m; ddRender(); return; }
+  const it = ev.target.closest('[data-k]');
+  if (it) {
+    const kk = it.dataset.k, a = DD.anchor;
+    // Isi kotak diganti nama yang dipilih, supaya event change dari teks ketikan tidak menimpa pilihan
+    if (a && DD.mode === 'list') { const o = DD.items.find((x) => String(x.k) === kk); a.value = o && kk !== '-1' ? o.label : ''; }
+    ddClose(); window.onPick(kk);
+  }
+});
+window.addEventListener('resize', ddClose);
+$('panel').addEventListener('scroll', ddClose);
+
+// ---- Sambungkan HP (kode QR) ----
+let pT = 0, pCode = '';
+async function pInfo() {
+  try {
+    const j = await (await fetch('/pairinfo')).json();
+    if (j.code !== pCode) { pCode = j.code; $('qr').src = '/qr.svg?c=' + j.code; }
+    $('pips').textContent = j.ips.join(' / ') || '-';
+    if (document.activeElement !== $('pport') && !pDirty) $('pport').value = j.wanted;
+    if (!pBusy) {
+      if (j.port !== j.wanted) pMsg('no', `localhost:${j.wanted} telah digunakan program lain, jadi Gatito sementara memakai ${j.port}.`);
+      else if (!pPending) pMsg('', 'Berjalan di port ' + j.port + '. Angka port bisa diubah.');
+    }
+    $('ppin').textContent = j.code;
+  } catch (e) {}
+}
+let pDirty = false, pBusy = false, pPending = false;
+const pMsg = (c, t) => { $('pmsg').className = 'pm ' + c; $('pmsg').textContent = t; };
+$('pport').oninput = () => { pDirty = true; pBusy = false; };
+async function pSave() {
+  const r = await (await fetch('/port-set', { method: 'POST', body: JSON.stringify({ port: $('pport').value }) })).json();
+  pBusy = true;
+  if (r.error) { pMsg('no', r.error); return; }
+  pDirty = false;
+  if (r.restart) { pPending = true; pMsg('ok', 'Tersimpan. Mulai ulang Gatito agar port baru berlaku. HP perlu scan QR lagi.'); $('prestart').style.display = ''; }
+  else { pPending = false; pMsg('ok', 'Port ini sudah dipakai sekarang.'); $('prestart').style.display = 'none'; }
+}
+$('psave').onclick = pSave;
+$('pport').onkeydown = (ev) => { if (ev.key === 'Enter') pSave(); };
+$('prestart').onclick = () => fetch('/restart', { method: 'POST' });
+function hClose() { $('hmodal').hidden = true; }
+$('pavoid').onclick = async () => {
+  const j = await (await fetch('/portinfo')).json();
+  $('hlist').innerHTML = j.avoid.map((a) => `<div class="hr"><b>${a.port}</b><span>${esc(a.name)}</span></div>`).join('');
+  $('hmodal').hidden = false;
+};
+$('hclose').onclick = hClose;
+function pClose() { $('pmodal').hidden = true; clearInterval(pT); }
+$('gear').onclick = () => { $('pmodal').hidden = false; pDirty = false; pBusy = false; pInfo(); clearInterval(pT); pT = setInterval(pInfo, 3000); };
+$('pclose').onclick = pClose;
+
+// ---- Tombol virtual (di dalam aplikasi) ----
+const V = { m: 'F', busy: false };
+const ordV = (v) => (v[0] === 'F' ? +v.slice(1) : 100 + +v.slice(1));
+const VHINT = 'Tekan sebuah tombol, lalu dalam 5 detik klik kotak hotkey di OBS (atau aplikasi lain). Tombol dikirim setelah hitungan selesai.';
+function vDraw() {
+  document.querySelectorAll('#vsw button').forEach((b) => b.classList.toggle('on', b.dataset.m === V.m));
+  const U = V.m === 'U';
+  $('vg').hidden = U; $('vul').hidden = !U;
+  if (U) {
+    const us = (st.usedVk || []).slice().sort((a, b) => ordV(a.vk) - ordV(b.vk));
+    $('vul').innerHTML = us.map((u) => `<div class="ur"><div class="f">${esc(u.vk)}</div><div class="k" style="${u.img ? "background-image:url('" + esc(u.img) + "')" : 'background:' + esc(u.color || '#4f6df5')}"></div><div class="n">${esc(u.label) || '<span style="color:#8b90a0">(tanpa nama)</span>'}<small>${esc(u.prof)}, halaman ${esc(u.page)}</small></div></div>`).join('') || '<p style="color:#8b90a0">Belum ada tombol virtual yang dipakai.</p>';
+    $('vhint').textContent = 'Tombol virtual yang sedang dipakai di semua profil.';
+  } else {
+    const list = V.m === 'F' ? Array.from({ length: 12 }, (_, i) => 'F' + (13 + i)) : Array.from({ length: 36 }, (_, i) => 'K' + (i + 1));
+    $('vg').innerHTML = list.map((v) => `<button data-v="${v}"${V.busy ? ' disabled' : ''}>${v}</button>`).join('');
+    if (!V.busy) $('vhint').textContent = VHINT;
+  }
+}
+function vClose() { $('vmodal').hidden = true; }
+$('vp').onclick = () => { $('vmodal').hidden = false; vDraw(); };
+$('vclose').onclick = vClose;
+$('vfloat').onclick = () => { vClose(); fetch('/vpad/open', { method: 'POST' }); };
+document.querySelectorAll('#vsw button').forEach((b) => (b.onclick = () => { V.m = b.dataset.m; vDraw(); }));
+$('vg').onclick = (ev) => {
+  const b = ev.target.closest('[data-v]'); if (!b || V.busy) return;
+  const vk = b.dataset.v; V.busy = true; vDraw();
+  send({ t: 'test', key: { action: 'vkey', vk }, delay: 5000 });
+  let n = 5;
+  const tick = () => {
+    if (n > 0) { $('vhint').innerHTML = `<b>${vk}</b> dikirim dalam <b>${n}</b> detik. Klik kotak hotkey di OBS sekarang.`; n--; setTimeout(tick, 1000); }
+    else { V.busy = false; vDraw(); $('vhint').innerHTML = `<b>${vk}</b> terkirim.`; setTimeout(() => { if (!V.busy && V.m !== 'U') $('vhint').textContent = VHINT; }, 2500); }
+  };
+  tick();
+};
+
+// ---- Suara dan mikrofon virtual ----
+const A = { cfg: null, info: null, t: 0, ti: 0, inst: null };
+const dot = (c, t) => `<div style="display:flex;gap:8px;align-items:flex-start;margin:4px 0;font-size:13px;line-height:1.4"><span style="flex:none;width:10px;height:10px;border-radius:50%;margin-top:4px;background:${c}"></span><span>${t}</span></div>`;
+const opt = (v, t, cur) => `<option value="${esc(v)}"${v === cur ? ' selected' : ''}>${esc(t)}</option>`;
+const realMic = (s) => (s && !/^(Mati|Belum|Gagal|Tidak)/.test(s) ? s : '');
+// Nama perangkat dipersingkat untuk tampilan: buang "(VB-Audio Virtual Cable)", "(VB-Output)", dan kode USB seperti "(301a:7c19)"
+const tidy = (l) => String(l || '').replace(/\s*\((?:VB-Audio Virtual Cable|VB-Output)\)/gi, '').replace(/\s*\([0-9a-f]{4}:[0-9a-f]{4}\)/gi, '').trim();
+function instHtml() {
+  const s = A.inst; if (!s || !s.msg) return '';
+  return dot(s.err ? '#e5534b' : s.running ? '#e0a23a' : '#46c27d', esc(s.msg)) + (s.notes || []).map((n) => dot('#e0a23a', esc(n))).join('');
+}
+async function aLoad() {
+  try { A.info = await (await fetch('/audio/info')).json(); A.cfg = A.info.cfg; } catch (e) { A.info = { ready: false }; }
+  aDraw();
+}
+function aSave(patch) {
+  Object.assign(A.cfg, patch);
+  return fetch('/audio/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(A.cfg) }).then(() => aLoad());
+}
+function aPoll() {
+  clearInterval(A.ti);
+  A.ti = setInterval(async () => {
+    try {
+      const s = await (await fetch('/audio/install/status')).json(); A.inst = s;
+      if ($('ainst')) $('ainst').innerHTML = instHtml();
+      if (!s.running) { clearInterval(A.ti); aLoad(); }
+    } catch (e) {}
+  }, 1000);
+}
+async function aInstall(install) {
+  A.inst = { running: true, msg: 'Memulai…', notes: [] };
+  if ($('ainst')) $('ainst').innerHTML = instHtml();
+  await fetch('/audio/install', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ install }) });
+  aPoll();
+}
+function aDraw() {
+  const i = A.info, c = A.cfg, B = $('abody');
+  if (!i || !i.ready) { B.innerHTML = '<div id="ainst">' + instHtml() + '</div>' + dot('#e0a23a', 'Mesin suara belum siap. Tunggu beberapa detik lalu klik Segarkan.'); return; }
+  const lab = (list, id) => (list.find((d) => d.id === id) || {}).label || '';
+  let st = '';
+  if (!i.cableFound) {
+    if (c.virt.id === 'none') st += dot('#e0a23a', 'Kirim ke teman dimatikan, jadi hanya kamu yang mendengar soundboard.');
+    else st += dot('#e5534b', `VB-Cable belum terpasang, teman belum bisa mendengar soundboard. <button class="sb" id="ainstall" style="margin-left:6px">Pasang otomatis</button><br><span class="mut" style="font-size:12px">Gratis dari vb-audio.com. Saat Windows meminta izin, klik Ya dan Install.</span>`);
+  } else if (i.defInVirt) st += dot('#46c27d', `Mic virtual aktif sebagai mic default <button class="sb" id="arestore" style="margin-left:6px">Kembalikan ke mic asli</button>`);
+  else st += dot('#e0a23a', `Mic virtual aktif, belum jadi mic default. <button class="sb" id="aauto" style="margin-left:6px">Atur otomatis</button>`);
+  if (i.cableFound && i.mic && !realMic(i.mic)) st += dot('#e0a23a', `Mic asli: ${esc(i.mic)}`);
+  (i.warns || []).forEach((w) => (st += dot('#e0a23a', esc(w))));
+  (i.errs || []).forEach((w) => (st += dot('#e5534b', esc(w))));
+  if (i.permErr) st += dot('#e0a23a', `Nama perangkat tidak terbaca (${esc(i.permErr)}). Cek izin mikrofon Windows untuk aplikasi desktop.`);
+  const outs = i.out, ins = i.inp.filter((d) => !d.v);
+  const vc = c.virt.id, mc = c.mon.id || 'default', ic = c.mic.id === 'off' ? 'off' : (i.micId || c.mic.id || '');
+  const sld = (id, l, max, v) => `<label>${l}<div class="sl"><input type="range" id="${id}" min="0" max="${max}" value="${v}"><span>${v}%</span></div></label>`;
+  B.innerHTML = '<div id="ainst">' + instHtml() + '</div>' + st +
+    `<label style="grid-auto-flow:column;align-items:flex-start;gap:8px;justify-content:start;color:#e8e9ed;font-size:12.5px;line-height:1.4;margin-top:6px"><input type="checkbox" id="aautosw" style="margin-top:2px"${c.auto ? ' checked' : ''}><span>Ganti mic Windows otomatis saat Gatito dibuka dan ditutup<br><span class="mut">Di aplikasi lain, atur input mic ke Default agar ikut berpindah.</span></span></label>` +
+    `<div class="ag">` +
+    `<label><span class="lt">Mic virtual <span class="rec">(${esc(i.cableFound ? tidy(i.cable) : 'belum terpasang')})</span></span><select id="svirt">${opt('', 'Otomatis (rekomendasi)', vc)}${outs.map((d) => opt(d.id, d.label, vc)).join('')}${opt('none', 'Jangan kirim ke teman', vc)}</select></label>` +
+    `<label>Speaker<select id="smon">${opt('default', 'Default Windows', mc)}${outs.filter((d) => !d.v).map((d) => opt(d.id, d.label, mc)).join('')}${opt('off', 'Mati (aku tidak mendengar)', mc)}</select></label>` +
+    `<label><span class="lt">Mic <span class="rec">(${esc(tidy(realMic(i.mic)) || '-')})</span></span><select id="smic">${opt('', 'Otomatis (rekomendasi)', ic)}${ins.map((d) => opt(d.id, d.label, ic)).join('')}${opt('off', 'Mati (hanya soundboard)', ic)}</select></label>` +
+    sld('cv', 'Volume mic', 200, c.micVol) + sld('vv', 'Volume ke teman', 200, c.vVol) + sld('mv', 'Volume di speakerku', 100, c.mVol) +
+    `<label>Level mic<div class="mt"><i id="lmic"></i></div></label><label>Level mic virtual<div class="mt"><i id="lout"></i></div></label></div>`;
+  const pick = (id, list, key) => { $(id).onchange = (ev) => { const v = ev.target.value; aSave({ [key]: { id: v, label: ['', 'default', 'off', 'none'].includes(v) ? '' : lab(list, v) } }); }; };
+  pick('svirt', outs, 'virt'); pick('smon', outs, 'mon'); pick('smic', i.inp, 'mic');
+  [['vv', 'vVol'], ['mv', 'mVol'], ['cv', 'micVol']].forEach(([id, k]) => {
+    const el = $(id); pf(el); el.oninput = () => { el.nextElementSibling.textContent = el.value + '%'; pf(el); };
+    el.onchange = () => aSave({ [k]: +el.value });
+  });
+  $('aautosw').onchange = (ev) => aSave({ auto: ev.target.checked ? 1 : 0 });
+  if ($('ainstall')) $('ainstall').onclick = () => aInstall(true);
+  if ($('aauto')) $('aauto').onclick = () => aInstall(false);
+  if ($('arestore')) $('arestore').onclick = async () => {
+    let r; try { r = await (await fetch('/audio/restoremic', { method: 'POST' })).json(); } catch (e) { r = { ok: false, err: 'Gagal.' }; }
+    A.inst = { running: false, msg: r.ok ? 'Mic default Windows dikembalikan ke mic asli.' : r.err || 'Gagal.', err: r.ok ? '' : r.err || 'Gagal.', notes: [] };
+    aLoad();
+  };
+}
+async function aLevel() {
+  try {
+    const l = await (await fetch('/audio/level')).json();
+    const f = (v) => Math.max(0, Math.min(100, ((20 * Math.log10(v || 1e-6)) + 60) / 60 * 100));
+    if ($('lmic')) $('lmic').style.width = f(l.mic) + '%';
+    if ($('lout')) $('lout').style.width = f(l.out) + '%';
+  } catch (e) {}
+}
+function aClose() { $('amodal').hidden = true; clearInterval(A.t); clearInterval(A.ti); }
+$('au').onclick = async () => {
+  $('amodal').hidden = false; $('abody').innerHTML = dot('#8b90a0', 'Memeriksa perangkat suara…');
+  clearInterval(A.t); A.t = setInterval(aLevel, 120);
+  try { const s = await (await fetch('/audio/install/status')).json(); if (s.running) { A.inst = s; aPoll(); } else if (!A.inst && s.msg) A.inst = s; } catch (e) {}
+  aLoad();
+};
+$('aclose').onclick = aClose;
+$('arefresh').onclick = () => { $('abody').innerHTML = dot('#8b90a0', 'Memeriksa perangkat suara…'); fetch('/audio/refresh', { method: 'POST' }).then(aLoad); };
+$('atest').onclick = () => fetch('/audio/test', { method: 'POST' });
+
+// Pemantau OBS
+let oT = 0;
+const hms = (ms) => { const s = Math.floor(ms / 1000); return [Math.floor(s / 3600), Math.floor(s / 60) % 60, s % 60].map((n) => String(n).padStart(2, '0')).join(':'); };
+async function oStat() {
+  try {
+    const s = await (await fetch('/obs/status')).json();
+    let h;
+    if (s.link === 'off') h = dot('#8b90a0', 'Pemantauan belum diaktifkan.');
+    else if (s.link === 'ok') h = dot('#46c27d', 'Terhubung ke OBS') + '<div class="orow">' + dot(s.live ? '#e5534b' : '#8b90a0', 'Live: ' + (s.live ? (s.recon ? 'menyambung ulang ' : 'berjalan ') + hms(s.liveMs) : 'belum mulai')) + dot(s.rec ? '#e5534b' : '#8b90a0', 'Rekaman: ' + (s.rec ? (s.paused ? 'dijeda ' : 'berjalan ') + hms(s.recMs) : 'belum mulai')) + '</div>';
+    else h = dot(s.link === 'auth' ? '#e5534b' : '#e0a23a', esc(s.msg));
+    $('ost').innerHTML = h;
+    const L = { live: 'Live', rec: 'Rekam', skip: 'diabaikan' };
+    $('oouts').innerHTML = s.link === 'ok' && s.outs && s.outs.length ? '<div style="color:#8b90a0;font-size:12px;margin:8px 0 2px">Output yang terbaca di OBS:</div>' + s.outs.map((o) => dot(o.active ? '#e5534b' : '#8b90a0', esc(o.name) + ' <span style="color:#8b90a0">(' + esc(o.kind) + ', ' + L[o.type] + ')</span>' + (o.active ? ' ' + hms(o.ms) : ''))).join('') : '';
+  } catch (e) {}
+}
+function oClose() { $('omodal').hidden = true; clearInterval(oT); }
+$('ob').onclick = async () => {
+  $('omodal').hidden = false; $('opass').value = '';
+  try { const c = await (await fetch('/obs/settings')).json(); $('oon').checked = !!c.on; $('ohost').value = c.host; $('oport').value = c.port; $('opass').placeholder = c.hasPass ? '(tersimpan, ketik untuk mengganti)' : ''; } catch (e) {}
+  oStat(); clearInterval(oT); oT = setInterval(oStat, 1000);
+};
+$('osave').onclick = async () => {
+  const b = { on: $('oon').checked ? 1 : 0, host: $('ohost').value.trim(), port: +$('oport').value };
+  if ($('opass').value) b.pass = $('opass').value;
+  try { const c = await (await fetch('/obs/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) })).json(); $('opass').value = ''; $('opass').placeholder = c.hasPass ? '(tersimpan, ketik untuk mengganti)' : ''; } catch (e) {}
+  oStat();
+};
+$('oclose').onclick = oClose;
+
+// Esc atau klik area gelap menutup jendela
+const CLOSERS = { hmodal: hClose, amodal: aClose, pmodal: pClose, vmodal: vClose, omodal: oClose };
+document.addEventListener('keydown', (ev) => { if (ev.key !== 'Escape') return; if (cRes) { cRes(false); return; } for (const id in CLOSERS) if (!$(id).hidden) { CLOSERS[id](); break; } });
+Object.keys(CLOSERS).forEach((id) => $(id).addEventListener('mousedown', (ev) => { if (ev.target === $(id)) CLOSERS[id](); }));
+
+function fillProf() {
+  $('prof').innerHTML = st.profiles.map((n, i) => `<option value="${i}"${i === st.cur ? ' selected' : ''}>${esc(n)}</option>`).join('');
+}
+$('prof').onchange = () => send({ t: 'prof', i: +$('prof').value });
+function askName(title, val) {
+  return new Promise((res) => {
+    $('ntitle').textContent = title; $('nin').value = val || ''; $('nmodal').hidden = false; $('nin').focus();
+    const done = (v) => { $('nmodal').hidden = true; res(v); };
+    $('nok').onclick = () => done($('nin').value.trim() || null);
+    $('ncancel').onclick = () => done(null);
+    $('nin').onkeydown = (e) => { if (e.key === 'Enter') $('nok').click(); if (e.key === 'Escape') $('ncancel').click(); };
+  });
+}
+$('pnew').onclick = async () => { const n = await askName('Nama profil baru', ''); if (n) send({ t: 'addProf', name: n }); };
+$('pren').onclick = async () => { const n = await askName('Ubah nama profil', st.profiles[st.cur]); if (n) send({ t: 'renProf', i: st.cur, name: n }); };
+$('pdel').onclick = async () => {
+  if (st.profiles.length < 2) return toast('Minimal harus ada satu profil');
+  if (await askConfirm('Hapus profil "' + st.profiles[st.cur] + '"?', 'Semua halaman dan tombol di profil ini ikut terhapus.')) send({ t: 'delProf', i: st.cur });
+};
+
+window.onPick = (key) => {
+  const cur = sel !== null && st.pages[page] && st.pages[page].keys[sel]; if (!cur) return;
+  if (cur.action === 'vkey') cur.vk = key;
+  else if (cur.action === 'open') {
+    if (key === '-1') { cur.target = ''; cur.appName = ''; }
+    else { const a = APPS[+key]; if (a) { cur.target = a.path; cur.appName = a.name; } }
+  }
+  send({ t: 'set', p: page, k: sel, key: cur });
+};
+</script></body></html>

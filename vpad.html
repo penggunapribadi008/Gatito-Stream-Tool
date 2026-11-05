@@ -1,0 +1,27 @@
+<!DOCTYPE html><html lang="id"><head><meta charset="utf-8"><title>Tombol virtual</title>
+<style>*{box-sizing:border-box;scrollbar-width:thin;scrollbar-color:#3c3f48 transparent}html,body{margin:0;height:100%;background:#1e1f22;color:#e8e9ed;font:13px "Segoe UI",system-ui,sans-serif;user-select:none}
+body{border:1px solid #3c3f48}
+#h{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:4px 6px 4px 12px;background:#2d2e31;font-weight:600;-webkit-app-region:drag}
+#sw{display:flex;gap:2px;background:#1e1f22;border-radius:8px;padding:2px;-webkit-app-region:no-drag}
+#sw button{width:40px;height:24px;border:0;border-radius:6px;background:transparent;color:#8b90a0;font:inherit;font-weight:700;cursor:pointer}#sw button.on{background:#4f6df5;color:#fff}
+#x{-webkit-app-region:no-drag;justify-self:end;width:30px;height:28px;border:0;border-radius:6px;background:transparent;color:#e8e9ed;font-size:16px;cursor:pointer}#x:hover{background:#c94c5a}
+#b{padding:10px 12px}p{margin:0 0 10px;color:#8b90a0;line-height:1.4}
+#g{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;max-height:136px;overflow-y:auto;scrollbar-width:none}
+#g button{height:40px;border:0;border-radius:8px;background:#34363d;color:#e8e9ed;font:inherit;font-weight:600;cursor:pointer}#g button:active{background:#4f6df5}
+</style></head><body>
+<div id="h"><span>Tombol virtual</span><div id="sw"><button class="on" data-m="F">F</button><button data-m="K">K</button></div><button id="x" title="Tutup">✕</button></div>
+<div id="b"><p>Klik kotak hotkey di OBS, lalu tekan tombol di sini.</p><div id="g"></div></div>
+<script>
+const ws = new WebSocket('ws://' + location.host + '/ws'), g = document.getElementById('g');
+// K1 sampai K36 bukan tombol keyboard sungguhan. Windows hanya punya F13 sampai F24 yang bebas, jadi K diwujudkan sebagai F13-F24 + dua tombol pendamping.
+const combo = (v) => { const n = +v.slice(1); if (v[0] === 'F') return v; const i = n - 1; return ['Ctrl+Shift', 'Ctrl+Alt', 'Shift+Alt'][Math.floor(i / 12)] + '+F' + (13 + (i % 12)); };
+function build(m) {
+  g.innerHTML = '';
+  const list = m === 'F' ? Array.from({ length: 12 }, (_, i) => 'F' + (13 + i)) : Array.from({ length: 36 }, (_, i) => 'K' + (i + 1));
+  list.forEach((v) => { const b = document.createElement('button'); b.textContent = v; b.title = combo(v); b.onclick = () => ws.readyState === 1 && ws.send(JSON.stringify({ t: 'vsend', vk: v })); g.appendChild(b); });
+  document.querySelectorAll('#sw button').forEach((b) => b.classList.toggle('on', b.dataset.m === m));
+}
+document.querySelectorAll('#sw button').forEach((b) => b.onclick = () => build(b.dataset.m));
+build('F');
+document.getElementById('x').onclick = () => fetch('/vpad/close', { method: 'POST' });
+</script></body></html>
