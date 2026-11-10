@@ -1,5 +1,5 @@
 // Gatito: Stream Tool (PC): editor + server untuk HP
-const { app, BrowserWindow, Menu, Tray, dialog, nativeImage } = require('electron');
+const { app, BrowserWindow, Menu, Tray, dialog, nativeImage, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { start } = require('./server');
@@ -112,6 +112,7 @@ function boot() {
       vpad.loadURL(`http://127.0.0.1:${PORT}/vpad`);
     },
     closeVPad: closeV,
+    openUrl: (u) => { if (/^https:\/\/github\.com\//.test(String(u))) shell.openExternal(String(u)); },
     wantedPort: () => WANTED,
     savePort: (p) => fs.writeFileSync(PORTF, JSON.stringify({ port: p })),
     relaunch: () => { app.relaunch(); app.exit(0); }

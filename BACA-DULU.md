@@ -1,4 +1,13 @@
-# Gatito: Stream Tool 2.5.7
+# Gatito: Stream Tool 2.5.8
+
+## Yang baru di 2.5.8
+- **Scroll di HP tidak lagi memencet tombol.** Di jendela Tombol virtual, tombol hanya terkirim kalau jari diangkat tanpa bergeser. Tombol juga tidak menyala biru saat jari hanya menggeser. **Pasang apk-hp yang baru.**
+- **Tombol virtual (F13 sampai F24) sekarang ikut mengirim kode scan.** Sebelumnya hanya OBS yang mengenali, sedangkan Discord, game, dan aplikasi berbasis browser bisa mengabaikannya. Kalau aplikasi tujuan dijalankan sebagai **Administrator**, jalankan Gatito sebagai Administrator juga (klik kanan, Run as administrator), karena Windows memblokir tombol dari program biasa ke program Administrator.
+- **Indikator OBS di HP diringkas.** Bentuknya sekarang `LIVE` dan `REC` (redup kalau belum jalan), dan jadi `LIVE 00:12:34` kalau aktif. Peringatan kuning cuma satu kalimat pendek: `OBS terputus` atau `Password salah`.
+- **Logo OBS asli** dipakai di tombol OBS di Gatito.
+- **Nama file build:** `gatito-stream-tool-vX.X.X.exe` dan `gatito-stream-tool-vX.X.X.apk`, versinya mengikuti `version` di package.json. Di halaman Actions GitHub, file bisa diunduh langsung tanpa zip.
+- **Sidebar paling bawah menampilkan versi**, dengan tombol **Cek update** di ujungnya. Tombol itu mengecek rilis terbaru di GitHub. Supaya berfungsi, buat Release di GitHub dengan tag seperti `v2.5.9`. Kalau belum ada rilis, tampil "Belum ada rilis di GitHub".
+- Versi di pengaturan HP sekarang mengikuti versi aplikasi (sebelumnya tertulis 1.9.0).
 
 ## Yang baru di 2.5.7
 - **Tombol Suara, OBS, Tombol virtual, dan QR jadi ikon saja.** Ubah nama dan Hapus profil juga jadi ikon (pensil dan tempat sampah). Di HP, tombol Tombol virtual juga jadi ikon.
@@ -41,7 +50,7 @@
 - VB-Cable adalah donationware dari vb-audio.com. Gatito mengunduhnya langsung dari situs resmi mereka.
 
 ## Cara pasang update
-1. Upload semua isi folder ini kecuali folder .github ke GitHub, lalu Commit changes. build.yml tidak perlu diubah.
-2. Tunggu build selesai, download installer-pc dan apk-hp.
+1. Upload semua isi folder ini ke GitHub, **termasuk folder .github** (kali ini build.yml berubah), lalu Commit changes.
+2. Tunggu build selesai, lalu download file `gatito-stream-tool-vX.X.X.exe` dan `.apk` dari halaman Actions. Tidak perlu diekstrak.
 3. PC: TUTUP dulu Gatito yang lama lewat ikon tray (klik kanan, Keluar), baru pasang installer baru.
-4. HP: pasang APK baru (apk-hp), karena tombol virtual di HP berubah.
+4. HP: pasang APK baru, karena tombol virtual dan indikator OBS di HP berubah.

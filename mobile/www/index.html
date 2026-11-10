@@ -38,9 +38,10 @@ input[type=range]{accent-color:#4f6df5}
 .key.crt::after{content:"";position:absolute;inset:0;pointer-events:none;border-radius:inherit;background:repeating-linear-gradient(0deg,rgba(0,0,0,.35) 0 1px,transparent 1px 3px),radial-gradient(ellipse at center,transparent 55%,rgba(0,0,0,.55) 100%)}
 .key.crt.im{filter:contrast(1.2) saturate(1.35)}
 .tb{height:40px;padding:0 12px;border-radius:12px;background:#191b22;font-size:14px;margin-right:6px}
+#sheet,#vsheet,#profsheet{overscroll-behavior:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y}
 #vgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
-#vgrid button{touch-action:manipulation;height:64px;border-radius:14px;background:#1d2028;font-size:18px;font-weight:700}
-#vgrid button:active{background:#4f6df5}
+#vgrid button{touch-action:pan-y;height:64px;border-radius:14px;background:#1d2028;font-size:18px;font-weight:700}
+#vgrid button.fl{background:#4f6df5}
 #foot{display:flex;justify-content:center;padding-top:10px}
 @media (orientation:landscape){#bar{margin-bottom:4px}.pg button,#gear,.tb{height:34px}body{padding-bottom:max(18px,env(safe-area-inset-bottom))}#foot{position:fixed;right:max(16px,env(safe-area-inset-right));bottom:max(14px,env(safe-area-inset-bottom));padding:0;z-index:3}}
 #off{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:8;display:flex;align-items:center;justify-content:center;padding:20px}
@@ -57,6 +58,7 @@ input[type=range]{accent-color:#4f6df5}
 .op i{width:9px;height:9px;border-radius:50%;background:#555b6a;flex:none}
 .op.on{background:#3a1d22;color:#ff8a80}.op.on i{background:#ff4d4d;animation:bl 1.2s infinite}
 .op.pz{background:#3b3220;color:#f1c15a}.op.pz i{background:#f1c15a}
+.op.idle{opacity:.55}
 .op.warn{color:#e0a14a}
 @keyframes bl{50%{opacity:.3}}
 [hidden]{display:none!important}
@@ -70,7 +72,7 @@ input[type=range]{accent-color:#4f6df5}
 <div id="foot" hidden><div class="pg"><button id="prev">‹</button><span id="num">1</span><button id="next">›</button></div></div>
 <div id="center"></div>
 <div id="sheet" hidden>
-  <h2>Pengaturan</h2><p>Gatito: Stream Tool 1.9.0</p>
+  <h2>Pengaturan</h2><p>Gatito: Stream Tool v__VERSION__</p>
   <div class="card"><b>Ukuran tombol</b><input id="ks" type="range" min="56" max="130" style="width:100%;margin-top:12px"></div>
   <div class="card"><b>Layar HP</b><div style="color:#9aa0ae;margin-top:4px;font-size:13px">Selama aplikasi dibuka, layar tetap menyala.</div>
     <select id="sleep"><option value="0">Tidak pernah mati</option><option value="1">Mati setelah 1 menit</option><option value="2">Mati setelah 2 menit</option><option value="5">Mati setelah 5 menit</option><option value="10">Mati setelah 10 menit</option><option value="30">Mati setelah 30 menit</option></select></div>
@@ -199,11 +201,11 @@ function drawObs() {
   const el = $('obs'), show = !!O && O.link !== 'off' && !$('bar').hidden;
   if (show !== oShown) { oShown = show; el.hidden = !show; if (st && !$('grid').hidden) render(); }
   if (!show) return;
-  if (O.link !== 'ok') { el.innerHTML = '<span class="op warn"><i></i>' + (O.link === 'auth' ? 'Password OBS salah' : 'OBS tidak terhubung') + '</span>'; return; }
+  if (O.link !== 'ok') { el.innerHTML = '<span class="op warn"><i></i>' + (O.link === 'auth' ? 'Password salah' : 'OBS terputus') + '</span>'; return; }
   const dt = Date.now() - oAt;
-  const live = O.live ? (O.recon ? 'LIVE menyambung ulang ' : 'LIVE ') + hms(O.liveMs + dt) : 'LIVE belum mulai';
-  const rec = O.rec ? (O.paused ? 'REC dijeda ' + hms(O.recMs) : 'REC ' + hms(O.recMs + dt)) : 'REC belum mulai';
-  el.innerHTML = '<span class="op' + (O.live ? (O.recon ? ' pz' : ' on') : '') + '"><i></i>' + live + '</span><span class="op' + (O.rec ? (O.paused ? ' pz' : ' on') : '') + '"><i></i>' + rec + '</span>';
+  const live = O.live ? 'LIVE' + (O.recon ? ' putus ' : ' ') + hms(O.liveMs + dt) : 'LIVE';
+  const rec = O.rec ? (O.paused ? 'REC jeda ' + hms(O.recMs) : 'REC ' + hms(O.recMs + dt)) : 'REC';
+  el.innerHTML = '<span class="op' + (O.live ? (O.recon ? ' pz' : ' on') : ' idle') + '"><i></i>' + live + '</span><span class="op' + (O.rec ? (O.paused ? ' pz' : ' on') : ' idle') + '"><i></i>' + rec + '</span>';
 }
 setInterval(drawObs, 500);
 
@@ -219,7 +221,7 @@ function connect() {
     if (ws !== w) return;
     armOff(); O = null; drawObs();
     if (!opened && ++fails >= 4 && await probe(S.host)) { delete S.token; save(); fails = 0; return init(); }
-    $('stat').textContent = 'Menghubungkan ulang…';
+    $('stat').textContent = 'Menyambung…';
     setTimeout(() => ws === w && connect(), 1200);
   };
 }
@@ -256,13 +258,21 @@ $('prev').onclick = () => { if (st) { page = Math.max(0, page - 1); render(); } 
 $('next').onclick = () => { if (st) { page = Math.min(st.pages.length - 1, page + 1); render(); } };
 $('gear').onclick = () => { $('pcname').textContent = S.pc || 'PC'; $('pcinfo').textContent = S.host || ''; $('sheet').hidden = false; };
 $('ks').value = S.ks || 96;
+// Tap hanya terhitung kalau jari diangkat tanpa bergeser. Saat jari menggeser untuk scroll, browser membatalkan sentuhan (pointercancel) dan tombol tidak terkirim.
+function onTap(el, fn) {
+  let id = null, x0 = 0, y0 = 0, moved = false;
+  el.addEventListener('pointerdown', (e) => { id = e.pointerId; x0 = e.clientX; y0 = e.clientY; moved = false; });
+  el.addEventListener('pointermove', (e) => { if (e.pointerId === id && Math.hypot(e.clientX - x0, e.clientY - y0) > 8) moved = true; });
+  el.addEventListener('pointerup', (e) => { if (e.pointerId !== id) return; id = null; if (!moved) fn(e); });
+  el.addEventListener('pointercancel', () => { id = null; moved = true; });
+  el.addEventListener('contextmenu', (e) => e.preventDefault());
+}
 function buildV(m) {
   const g = $('vgrid'); g.innerHTML = '';
   const list = m === 'F' ? Array.from({ length: 12 }, (_, i) => 'F' + (13 + i)) : Array.from({ length: 36 }, (_, i) => 'K' + (i + 1));
   list.forEach((v) => {
     const b = document.createElement('button'); b.textContent = v;
-    // "click" hanya muncul kalau jari diangkat tanpa menggeser. Kalau dipakai untuk scroll, tombol tidak terkirim.
-    b.addEventListener('click', () => { if (navigator.vibrate) navigator.vibrate(15); if (ws && ws.readyState === 1) ws.send(JSON.stringify({ t: 'vsend', vk: v })); });
+    onTap(b, () => { b.classList.add('fl'); setTimeout(() => b.classList.remove('fl'), 140); if (navigator.vibrate) navigator.vibrate(15); if (ws && ws.readyState === 1) ws.send(JSON.stringify({ t: 'vsend', vk: v })); });
     g.appendChild(b);
   });
   document.querySelectorAll('#vsw button').forEach((b) => b.classList.toggle('on', b.dataset.m === m));

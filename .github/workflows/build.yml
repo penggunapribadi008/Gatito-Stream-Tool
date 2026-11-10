@@ -13,12 +13,16 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+      - name: Isi alamat GitHub untuk cek update
+        shell: bash
+        run: node -e "const fs=require('fs'),p=JSON.parse(fs.readFileSync('package.json','utf8'));p.updateRepo=process.env.GITHUB_REPOSITORY;fs.writeFileSync('package.json',JSON.stringify(p,null,2))"
       - run: npm install
       - run: npm run dist
-      - uses: actions/upload-artifact@v4
+      # archive: false membuat file .exe bisa diunduh langsung, tanpa zip
+      - uses: actions/upload-artifact@v7
         with:
-          name: installer-pc
-          path: dist/*.exe
+          path: dist/gatito-stream-tool-v*.exe
+          archive: false
 
   apk-hp:
     runs-on: ubuntu-latest
@@ -37,7 +41,7 @@ jobs:
           KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
         run: bash build-apk.sh
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
-          name: apk-hp
-          path: mobile/StreamDeckHP.apk
+          path: mobile/gatito-stream-tool-v*.apk
+          archive: false

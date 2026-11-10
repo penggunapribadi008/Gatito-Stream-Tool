@@ -1,9 +1,10 @@
 {
   "name": "streamdeck-hp",
-  "version": "2.5.7",
+  "version": "2.5.8",
   "description": "Gatito: Stream Tool",
   "main": "main.js",
   "author": "StreamDeck HP",
+  "updateRepo": "",
   "scripts": {
     "start": "electron .",
     "dist": "electron-builder --win nsis --publish never"
@@ -13,8 +14,8 @@
   "build": {
     "appId": "com.streamdeckhp.app",
     "productName": "Gatito Stream Tool",
-    "files": ["main.js", "server.js", "vbsetup.js", "obs.js", "editor.html", "vpad.html", "audio.html", "build/icon.png", "mobile/www/**/*", "package.json"],
+    "files": ["main.js", "server.js", "vbsetup.js", "obs.js", "editor.html", "vpad.html", "audio.html", "build/icon.png", "assets/**/*", "mobile/www/**/*", "package.json"],
     "win": { "target": "nsis", "icon": "build/icon.png" },
-    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true }
+    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true, "artifactName": "gatito-stream-tool-v${version}.${ext}" }
   }
 }

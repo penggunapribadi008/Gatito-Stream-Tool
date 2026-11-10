@@ -5,6 +5,7 @@ const path = require('path');
 const os = require('os');
 const crypto = require('crypto');
 const net = require('net');
+const https = require('https');
 const { spawn } = require('child_process');
 const { WebSocketServer } = require('ws');
 const QRCode = require('qrcode');
@@ -28,6 +29,28 @@ const OBSM = require('./obs');
 const withTimeout = (pr, ms) => Promise.race([Promise.resolve(pr).catch(() => null), new Promise((r) => setTimeout(() => r(null), ms))]);
 
 let H = {};
+const APPV = (() => { try { return require('./package.json'); } catch (e) { return {}; } })();
+const verNum = (v) => String(v || '').replace(/^v/i, '').split(/[.\-+]/).slice(0, 3).map((n) => parseInt(n, 10) || 0);
+const isNewer = (a, b) => { const x = verNum(a), y = verNum(b); for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); return false; };
+// Cek rilis terbaru di GitHub (repo diisi otomatis oleh build di package.json: updateRepo)
+function checkUpdate() {
+  return new Promise((res) => {
+    const repo = String(APPV.updateRepo || '');
+    if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) return res({ state: 'norepo' });
+    const rq = https.get({ hostname: 'api.github.com', path: '/repos/' + repo + '/releases/latest', headers: { 'User-Agent': 'gatito-stream-tool', Accept: 'application/vnd.github+json' }, timeout: 8000 }, (rs) => {
+      let b = ''; rs.on('data', (c) => (b += c));
+      rs.on('end', () => {
+        if (rs.statusCode === 404) return res({ state: 'norelease' });
+        try {
+          const j = JSON.parse(b);
+          if (rs.statusCode !== 200 || !j.tag_name) return res({ state: 'error' });
+          res({ state: isNewer(j.tag_name, APPV.version) ? 'new' : 'latest', latest: String(j.tag_name).replace(/^v/i, ''), url: j.html_url });
+        } catch (e) { res({ state: 'error' }); }
+      });
+    });
+    rq.on('timeout', () => rq.destroy()); rq.on('error', () => res({ state: 'error' }));
+  });
+}
 const MEDIA = { volup: 175, voldown: 174, mute: 173, playpause: 179, next: 176, prev: 177 };
 const q = (s) => String(s).replace(/'/g, "''");
 // Volume tombol 0 sampai 200. Angka 0 harus tetap 0 (bukan jatuh ke 80)
@@ -39,7 +62,10 @@ const PS_INIT = [
   'Add-Type -AssemblyName System.Windows.Forms',
   '$w=New-Object -ComObject WScript.Shell; $pl=@{}',
   `Add-Type -Namespace W -Name K -MemberDefinition '[DllImport("user32.dll")] public static extern void keybd_event(byte b, byte s, int f, int e);'`,
-  'function sdvk($v,$m){$k=@();if($m -match "c"){$k+=17};if($m -match "s"){$k+=16};if($m -match "a"){$k+=18};foreach($x in $k){[W.K]::keybd_event($x,0,0,0)};[W.K]::keybd_event($v,0,0,0);Start-Sleep -Milliseconds 100;[W.K]::keybd_event($v,0,2,0);foreach($x in $k){[W.K]::keybd_event($x,0,2,0)}}',
+  // Kode scan ikut dikirim (F13 sampai F23 = 0x64 sampai 0x6E, F24 = 0x76), supaya aplikasi selain OBS (Discord, game, browser) juga mengenali tombolnya
+  'function sdsc($v){if($v -eq 135){118}else{100+$v-124}}',
+  'function sdms($v){if($v -eq 17){29}elseif($v -eq 16){42}else{56}}',
+  'function sdvk($v,$m){$k=@();if($m -match "c"){$k+=17};if($m -match "s"){$k+=16};if($m -match "a"){$k+=18};foreach($x in $k){[W.K]::keybd_event($x,(sdms $x),0,0)};$s=sdsc $v;[W.K]::keybd_event($v,$s,0,0);Start-Sleep -Milliseconds 120;[W.K]::keybd_event($v,$s,2,0);foreach($x in $k){[W.K]::keybd_event($x,(sdms $x),2,0)}}',
 ].join('\n') + '\n';
 
 let psProc = null;
@@ -190,7 +216,17 @@ function start(file, port, hooks) {
       try { res.writeHead(200, Object.assign({ 'Content-Type': 'image/' + (im[2] === 'jpg' ? 'jpeg' : im[2]), 'Cache-Control': 'max-age=31536000' }, cors)); return res.end(fs.readFileSync(path.join(imgDir, im[1]))); }
       catch (e) { return send(404, 'text/plain', ''); }
     }
-    if (p === '/') return send(200, 'text/html; charset=utf-8', fs.readFileSync(path.join(__dirname, 'mobile', 'www', 'index.html')));
+    if (p === '/') return send(200, 'text/html; charset=utf-8', fs.readFileSync(path.join(__dirname, 'mobile', 'www', 'index.html'), 'utf8').replace(/__VERSION__/g, String(APPV.version || '')));
+    if (local && p === '/appinfo') return json({ version: APPV.version || '' });
+    if (local && p === '/obs-logo.png') { try { return send(200, 'image/png', fs.readFileSync(path.join(__dirname, 'assets', 'obs-logo.png'))); } catch (e) { return send(404, 'text/plain', ''); } }
+    if (local && req.method === 'POST' && p === '/update/check') return checkUpdate().then(json);
+    if (local && req.method === 'POST' && p === '/update/open') {
+      if (!sameOrigin(req)) return send(403, 'text/plain', 'forbidden');
+      let b = '';
+      req.on('data', (c) => (b += c));
+      req.on('end', () => { let j = {}; try { j = JSON.parse(b); } catch (e) {} if (typeof j.url === 'string' && /^https:\/\/github\.com\//.test(j.url) && H.openUrl) H.openUrl(j.url); json({ ok: 1 }); });
+      return;
+    }
     if (local && p === '/editor') return send(200, 'text/html; charset=utf-8', fs.readFileSync(path.join(__dirname, 'editor.html')));
     if (local && p === '/pairinfo') return json({ code, ips: ips(), port, wanted: H.wantedPort ? H.wantedPort() : port });
     if (local && p === '/portinfo') return json({ port, avoid: AVOID });
