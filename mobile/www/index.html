@@ -243,7 +243,7 @@ function render() {
       el.style.setProperty('--c', k.color || '#4f6df5');
       if (k.img) el.style.backgroundImage = 'url(' + (k.img.startsWith('/') ? 'http://' + S.host + k.img : k.img) + ')';
       el.innerHTML = '<span class="lb"></span>'; el.firstChild.textContent = k.label || '';
-      el.addEventListener('pointerdown', () => press(i, k));
+      onTap(el, () => press(i, k));
     }
     g.appendChild(el);
   }
