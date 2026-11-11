@@ -2,6 +2,7 @@
 const { app, BrowserWindow, Menu, Tray, dialog, nativeImage, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const { spawn } = require('child_process');
 const { start } = require('./server');
 let PORT = 3000, WANTED = 3000;
 const net = require('net');
@@ -115,7 +116,16 @@ function boot() {
     openUrl: (u) => { if (/^https:\/\/github\.com\//.test(String(u))) shell.openExternal(String(u)); },
     wantedPort: () => WANTED,
     savePort: (p) => fs.writeFileSync(PORTF, JSON.stringify({ port: p })),
-    relaunch: () => { app.relaunch(); app.exit(0); }
+    relaunch: () => { app.relaunch(); app.exit(0); },
+    // Pasang update: tunggu aplikasi tertutup, jalankan installer diam-diam, lalu buka lagi aplikasinya
+    applyUpdate: (file) => {
+      if (!app.isPackaged || process.platform !== 'win32') return false;
+      const e = (s) => String(s).replace(/'/g, "''");
+      const cmd = `Wait-Process -Id ${process.pid} -ErrorAction SilentlyContinue; Start-Process -FilePath '${e(file)}' -ArgumentList '/S' -Wait; Start-Process -FilePath '${e(process.execPath)}'`;
+      try { spawn('powershell', ['-NoProfile', '-WindowStyle', 'Hidden', '-Command', cmd], { detached: true, stdio: 'ignore', windowsHide: true }).unref(); } catch (x) { return false; }
+      setTimeout(() => app.quit(), 800);
+      return true;
+    }
   };
   try { migrate(); } catch (e) { console.error(e); }
   srv = start(path.join(app.getPath('userData'), 'deck2.json'), PORT, hooks);

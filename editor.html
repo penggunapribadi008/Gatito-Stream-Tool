@@ -502,21 +502,38 @@ $('aclose').onclick = aClose;
 $('arefresh').onclick = () => { $('abody').innerHTML = dot('#8b90a0', 'Memeriksa perangkat suara…'); fetch('/audio/refresh', { method: 'POST' }).then(aLoad); };
 $('atest').onclick = () => fetch('/audio/test', { method: 'POST' });
 
-// Versi aplikasi dan cek update (rilis terbaru di GitHub)
-let upUrl = '';
+// Versi aplikasi dan update otomatis (rilis terbaru di GitHub)
+let upNew = null, upBusy = false;
+const uBtn = $('ucheck'), uPost = (u) => fetch(u, { method: 'POST' }).then((r) => r.json()), uWait = (ms) => new Promise((r) => setTimeout(r, ms));
 fetch('/appinfo').then((r) => r.json()).then((j) => { $('vlabel').textContent = 'Versi ' + (j.version || '-'); }).catch(() => {});
-function uMsg(c, t) { const m = $('umsg'); m.hidden = !t; m.className = c; m.textContent = t || ''; }
-$('ucheck').onclick = async () => {
-  if (upUrl) { fetch('/update/open', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: upUrl }) }); return; }
-  const b = $('ucheck'); b.disabled = true; b.textContent = 'Memeriksa…'; uMsg('', '');
-  let r; try { r = await (await fetch('/update/check', { method: 'POST' })).json(); } catch (e) { r = { state: 'error' }; }
-  b.disabled = false; b.textContent = 'Cek update';
-  if (r.state === 'new') { upUrl = r.url; b.textContent = 'Unduh v' + r.latest; uMsg('ok', 'Ada versi baru: v' + r.latest); }
-  else if (r.state === 'latest') uMsg('ok', 'Sudah versi terbaru');
-  else if (r.state === 'norelease') uMsg('', 'Belum ada rilis di GitHub');
-  else if (r.state === 'norepo') uMsg('no', 'Alamat GitHub belum diatur');
-  else uMsg('no', 'Tidak bisa memeriksa. Cek internet.');
-};
+async function upGo() {
+  if (!upNew) return;
+  if (!upNew.asset) { fetch('/update/open', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: upNew.url }) }); return; }
+  upBusy = true; uBtn.disabled = true; uBtn.textContent = 'Mengunduh 0%';
+  let r; try { r = await uPost('/update/install'); } catch (e) { r = { state: 'error' }; }
+  while (r.state === 'down') {
+    uBtn.textContent = 'Mengunduh ' + r.pct + '%'; await uWait(400);
+    try { r = await (await fetch('/update/status')).json(); } catch (e) { r = { state: 'ready' }; }
+  }
+  if (r.state === 'ready') { uBtn.textContent = 'Memasang…'; return; }
+  upBusy = false; uBtn.disabled = false; uBtn.textContent = 'Gagal, coba lagi'; upNew = null;
+}
+async function upAsk() {
+  if (!upNew || upBusy) return;
+  const ok = await askConfirm('Update tersedia', 'Versi ' + upNew.latest + ' sudah tersedia. Update sekarang? Aplikasi akan ditutup, dipasang otomatis, lalu terbuka lagi.', 'Update');
+  if (ok) upGo();
+}
+async function upCheck(auto) {
+  if (upBusy) return;
+  uBtn.disabled = true; if (!auto) uBtn.textContent = 'Memeriksa…';
+  let r; try { r = await uPost('/update/check'); } catch (e) { r = { state: 'error' }; }
+  uBtn.disabled = false;
+  if (r.state === 'new') { upNew = r; uBtn.textContent = 'Update ke v' + r.latest; return upAsk(); }
+  upNew = null;
+  uBtn.textContent = r.state === 'latest' ? 'Sudah versi terbaru' : auto ? 'Cek update' : r.state === 'norelease' ? 'Belum ada rilis' : r.state === 'norepo' ? 'Repo belum diatur' : 'Gagal memeriksa';
+}
+uBtn.onclick = () => (upNew ? upAsk() : upCheck(false));
+setTimeout(() => upCheck(true), 2500);
 
 // Pemantau OBS
 let oT = 0;

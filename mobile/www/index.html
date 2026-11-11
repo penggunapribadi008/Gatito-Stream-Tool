@@ -18,7 +18,7 @@ input[type=range]{accent-color:#4f6df5}
 #num{min-width:22px;text-align:center;font-size:18px}
 #stat{font-size:12px;color:#e0a14a;margin:0 8px;flex:1;text-align:center}
 #grid{flex:1;display:grid;gap:8px;min-height:0;justify-content:center;align-content:center}
-.key{position:relative;border-radius:calc(var(--ks,80px)*.2);background:#000;border:2px solid #2b2e38;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;min-height:0;overflow:hidden;padding:4px}
+.key{position:relative;border-radius:calc(var(--ks,80px)*.2);background:#000;border:2px solid #2b2e38;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;min-height:0;overflow:hidden;padding:4px;touch-action:manipulation}
 .key.on{border:0;background-color:var(--c);box-shadow:inset 0 2px 0 rgba(255,255,255,.25),inset 0 -5px 0 rgba(0,0,0,.25)}
 .key.on:active{transform:scale(.93);filter:brightness(1.25)}
 .key.im{background-size:cover;background-position:center;justify-content:flex-end;padding:0}
@@ -76,6 +76,7 @@ input[type=range]{accent-color:#4f6df5}
   <div class="card"><b>Ukuran tombol</b><input id="ks" type="range" min="56" max="130" style="width:100%;margin-top:12px"></div>
   <div class="card"><b>Layar HP</b><div style="color:#9aa0ae;margin-top:4px;font-size:13px">Selama aplikasi dibuka, layar tetap menyala.</div>
     <select id="sleep"><option value="0">Tidak pernah mati</option><option value="1">Mati setelah 1 menit</option><option value="2">Mati setelah 2 menit</option><option value="5">Mati setelah 5 menit</option><option value="10">Mati setelah 10 menit</option><option value="30">Mati setelah 30 menit</option></select></div>
+  <div class="card"><b>Update aplikasi</b><button class="btn2" id="upbtn">Cek update</button></div>
   <div class="card"><b id="pcname">PC</b><div style="color:#9aa0ae;margin-top:4px" id="pcinfo"></div>
     <button class="btn2" id="rescan">Sambungkan ke PC lain (scan QR)</button>
     <button class="btn2" id="forget">Putuskan dari PC ini</button></div>
@@ -113,7 +114,7 @@ function dlg(o) {
     $('dt').textContent = o.title || ''; $('dx').textContent = o.text || ''; $('dx').hidden = !o.text;
     const F = $('df'); F.innerHTML = '';
     (o.fields || []).forEach((f) => { const i = document.createElement('input'); i.placeholder = f.ph || ''; i.setAttribute('inputmode', f.mode || 'text'); i.autocomplete = 'off'; F.appendChild(i); });
-    $('dc').hidden = !o.cancel; $('dok').textContent = o.ok || 'OK';
+    $('dc').hidden = !o.cancel; $('dok').hidden = false; $('dok').textContent = o.ok || 'OK';
     $('dok').onclick = () => dlgClose(o.fields ? [...F.querySelectorAll('input')].map((i) => i.value.trim()) : true);
     $('dc').onclick = () => dlgClose(null);
     $('dlg').hidden = false;
@@ -197,15 +198,16 @@ function init() {
 // Status OBS (Live dan Rekaman) dari PC. Lamanya dihitung terus di HP supaya jalan mulus di antara kiriman PC
 let O = null, oAt = 0, oShown = false;
 const hms = (ms) => { const s = Math.floor(ms / 1000); return [Math.floor(s / 3600), Math.floor(s / 60) % 60, s % 60].map((n) => String(n).padStart(2, '0')).join(':'); };
+const setH = (el, h) => { if (el._h !== h) { el._h = h; el.innerHTML = h; } }; // tulis ulang hanya kalau isinya berubah
 function drawObs() {
   const el = $('obs'), show = !!O && O.link !== 'off' && !$('bar').hidden;
   if (show !== oShown) { oShown = show; el.hidden = !show; if (st && !$('grid').hidden) render(); }
   if (!show) return;
-  if (O.link !== 'ok') { el.innerHTML = '<span class="op warn"><i></i>' + (O.link === 'auth' ? 'Password salah' : 'OBS terputus') + '</span>'; return; }
+  if (O.link !== 'ok') { setH(el, '<span class="op warn"><i></i>' + (O.link === 'auth' ? 'Password salah' : 'OBS terputus') + '</span>'); return; }
   const dt = Date.now() - oAt;
   const live = O.live ? 'LIVE' + (O.recon ? ' putus ' : ' ') + hms(O.liveMs + dt) : 'LIVE';
   const rec = O.rec ? (O.paused ? 'REC jeda ' + hms(O.recMs) : 'REC ' + hms(O.recMs + dt)) : 'REC';
-  el.innerHTML = '<span class="op' + (O.live ? (O.recon ? ' pz' : ' on') : ' idle') + '"><i></i>' + live + '</span><span class="op' + (O.rec ? (O.paused ? ' pz' : ' on') : ' idle') + '"><i></i>' + rec + '</span>';
+  setH(el, '<span class="op' + (O.live ? (O.recon ? ' pz' : ' on') : ' idle') + '"><i></i>' + live + '</span><span class="op' + (O.rec ? (O.paused ? ' pz' : ' on') : ' idle') + '"><i></i>' + rec + '</span>');
 }
 setInterval(drawObs, 500);
 
@@ -249,9 +251,9 @@ function render() {
   }
 }
 function press(i, k) {
-  if (navigator.vibrate) navigator.vibrate(15);
-  if (k.action === 'nav') { page = k.to === 'prev' ? Math.max(0, page - 1) : Math.min(st.pages.length - 1, page + 1); return render(); }
+  if (k.action === 'nav') { if (navigator.vibrate) navigator.vibrate(15); page = k.to === 'prev' ? Math.max(0, page - 1) : Math.min(st.pages.length - 1, page + 1); return render(); }
   if (ws && ws.readyState === 1) ws.send(JSON.stringify({ t: 'press', p: page, k: i }));
+  if (navigator.vibrate) navigator.vibrate(15);
 }
 addEventListener('resize', () => st && !$('grid').hidden && render());
 $('prev').onclick = () => { if (st) { page = Math.max(0, page - 1); render(); } };
@@ -305,9 +307,9 @@ $('profbtn').onclick = () => {
 };
 $('ks').oninput = () => { S.ks = +$('ks').value; save(); if (st && !$('grid').hidden) render(); };
 // Layar tetap menyala selama aplikasi dibuka; bisa diatur mati setelah beberapa menit tanpa disentuh
-let wl = null, idleT = null;
+let wl = null, idleT = null, natOn = null;
 function keepOn(on) {
-  try { if (window.GatitoNative) window.GatitoNative.keepOn(on); } catch (e) {}
+  try { if (window.GatitoNative && natOn !== on) { natOn = on; window.GatitoNative.keepOn(on); } } catch (e) {}
   if ('wakeLock' in navigator) {
     if (on && !wl) navigator.wakeLock.request('screen').then((l) => { wl = l; l.addEventListener('release', () => { wl = null; }); }).catch(() => {});
     if (!on && wl) { wl.release().catch(() => {}); wl = null; }
@@ -328,5 +330,55 @@ $('forget').onclick = reset;
 $('offforget').onclick = reset;
 $('offretry').onclick = () => { disarm(); const o = ws; ws = null; if (o) o.close(); connect(); };
 $('rescan').onclick = () => { reset(); };
+// Update aplikasi HP: cek rilis terbaru di GitHub, lalu unduh dan pasang lewat penginstal Android
+const nat = () => window.GatitoNative, UPREPO = '__REPO__';
+const verOf = (v) => String(v || '').replace(/^v/i, '').split(/[.\-+]/).slice(0, 3).map((n) => parseInt(n, 10) || 0);
+const newer = (a, b) => { const x = verOf(a), y = verOf(b); for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); return false; };
+let upInfo = null, upBusy = false;
+window.__dl = (p) => {
+  if (p === 'done') { upBusy = false; dlgClose(null); return; }
+  if (p === 'perm' || p === 'fail') {
+    upBusy = false; $('dt').textContent = p === 'perm' ? 'Izin diperlukan' : 'Gagal update';
+    $('dx').textContent = p === 'perm' ? 'Aktifkan izin "Pasang aplikasi tidak dikenal" untuk Gatito di pengaturan yang terbuka, lalu tekan Update lagi.' : 'Tidak bisa mengunduh update. Cek internet lalu coba lagi.';
+    $('dx').hidden = false; $('dok').hidden = false; $('dok').textContent = 'OK'; return;
+  }
+  $('dx').textContent = p + '%';
+};
+function upGo() {
+  upBusy = true;
+  dlg({ title: 'Mengunduh update', text: '0%' }); $('dok').hidden = true;
+  try { nat().installApk(upInfo.apk); } catch (e) { window.__dl('fail'); }
+}
+async function upAsk() {
+  if (!upInfo || upBusy) return;
+  const ok = await dlg({ title: 'Update tersedia', text: 'Versi ' + upInfo.tag + ' sudah tersedia. Update sekarang? Aplikasi akan diunduh lalu dipasang.', cancel: true, ok: 'Update' });
+  if (ok) upGo();
+}
+async function upCheck(auto) {
+  const b = $('upbtn');
+  if (!nat() || !nat().installApk || !nat().version) { if (!auto) dlg({ title: 'Update manual', text: 'APK di HP ini belum mendukung update otomatis. Pasang APK terbaru dari GitHub sekali saja, setelah itu update berikutnya otomatis.' }); return; }
+  if (!/^[\w.-]+\/[\w.-]+$/.test(UPREPO)) { if (!auto) b.textContent = 'Repo belum diatur'; return; }
+  if (upBusy) return;
+  if (!auto) b.textContent = 'Memeriksa…';
+  let j = null;
+  try {
+    const c = new AbortController(), t = setTimeout(() => c.abort(), 8000);
+    const r = await fetch('https://api.github.com/repos/' + UPREPO + '/releases/latest', { headers: { Accept: 'application/vnd.github+json' }, signal: c.signal });
+    clearTimeout(t); if (r.ok) j = await r.json();
+  } catch (e) {}
+  if (!j || !j.tag_name) { b.textContent = auto ? 'Cek update' : 'Gagal memeriksa'; return; }
+  let cur = ''; try { cur = String(nat().version() || ''); } catch (e) {}
+  const as = Array.isArray(j.assets) ? j.assets : [], a = as.find((x) => x && /\.apk$/i.test(String(x.name)));
+  if (cur && newer(j.tag_name, cur)) {
+    if (!a || !/^https:\/\/github\.com\//.test(String(a.browser_download_url))) { b.textContent = 'APK belum diunggah'; return; }
+    upInfo = { tag: String(j.tag_name).replace(/^v/i, ''), apk: a.browser_download_url };
+    b.textContent = 'Update ke v' + upInfo.tag;
+    if (auto && !$('dlg').hidden) return;
+    return upAsk();
+  }
+  upInfo = null; b.textContent = 'Sudah versi terbaru';
+}
+$('upbtn').onclick = () => (upInfo ? upAsk() : upCheck(false));
+setTimeout(() => upCheck(true), 5000);
 init();
 </script></body></html>

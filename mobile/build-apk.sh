@@ -11,11 +11,16 @@ test -s www/jsQR.js || { echo "jsQR.js tidak ditemukan"; exit 1; }
 npx cap add android
 M=android/app/src/main/AndroidManifest.xml
 grep -q 'permission.CAMERA' "$M" || sed -i 's#</manifest>#    <uses-permission android:name="android.permission.CAMERA" />\n</manifest>#' "$M"
+grep -q 'REQUEST_INSTALL_PACKAGES' "$M" || sed -i 's#</manifest>#    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />\n</manifest>#' "$M"
+grep -q 'androidx.core.content.FileProvider' "$M" || sed -i 's#</application>#        <provider android:name="androidx.core.content.FileProvider" android:authorities="${applicationId}.fileprovider" android:exported="false" android:grantUriPermissions="true"><meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" /></provider>\n    </application>#' "$M"
+mkdir -p android/app/src/main/res/xml
+printf '<?xml version="1.0" encoding="utf-8"?>\n<paths xmlns:android="http://schemas.android.com/apk/res/android">\n    <external-path name="my_images" path="." />\n    <cache-path name="my_cache_images" path="." />\n</paths>\n' > android/app/src/main/res/xml/file_paths.xml
 D=android/app/src/main/java/com/streamdeckhp/app
 mkdir -p "$D"
 cp native/MainActivity.java "$D/MainActivity.java"
 cp -r android-res/. android/app/src/main/res/
 sed -i "s/__VERSION__/$VER/g" www/index.html
+sed -i "s#__REPO__#${GITHUB_REPOSITORY:-}#g" www/index.html
 npx cap sync android
 cd android
 chmod +x gradlew

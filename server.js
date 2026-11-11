@@ -44,12 +44,44 @@ function checkUpdate() {
         try {
           const j = JSON.parse(b);
           if (rs.statusCode !== 200 || !j.tag_name) return res({ state: 'error' });
-          res({ state: isNewer(j.tag_name, APPV.version) ? 'new' : 'latest', latest: String(j.tag_name).replace(/^v/i, ''), url: j.html_url });
+          const nw = isNewer(j.tag_name, APPV.version), as = Array.isArray(j.assets) ? j.assets : [];
+          const a = as.find((x) => x && /^gatito-stream-tool-v[\d.]+\.exe$/i.test(String(x.name))) || as.find((x) => x && /\.exe$/i.test(String(x.name)));
+          const ok = !!a && typeof a.browser_download_url === 'string' && /^https:\/\/github\.com\//.test(a.browser_download_url);
+          const dg = ok && /^sha256:([a-f0-9]{64})$/i.exec(String(a.digest || ''));
+          res({ state: nw ? 'new' : 'latest', latest: String(j.tag_name).replace(/^v/i, ''), url: j.html_url, asset: nw && ok, _a: nw && ok ? { url: a.browser_download_url, name: String(a.name).replace(/[^\w.\-]/g, '_'), size: +a.size || 0, sha: dg ? dg[1].toLowerCase() : '' } : null });
         } catch (e) { res({ state: 'error' }); }
       });
     });
     rq.on('timeout', () => rq.destroy()); rq.on('error', () => res({ state: 'error' }));
   });
+}
+// Unduh dan pasang update otomatis: berkas diunduh ke folder sementara, diperiksa ukuran dan hash-nya, lalu dipasang diam-diam oleh main.js
+const UP = { state: 'idle', pct: 0 };
+function download(url, dest, size, hops, onPct) {
+  return new Promise((res, rej) => {
+    if (hops > 5 || !/^https:\/\//.test(url)) return rej(new Error('url'));
+    const rq = https.get(url, { headers: { 'User-Agent': 'gatito-stream-tool' }, timeout: 20000 }, (rs) => {
+      if ([301, 302, 303, 307, 308].includes(rs.statusCode) && rs.headers.location) { rs.resume(); return download(new URL(rs.headers.location, url).href, dest, size, hops + 1, onPct).then(res, rej); }
+      if (rs.statusCode !== 200) { rs.resume(); return rej(new Error('http ' + rs.statusCode)); }
+      const total = +rs.headers['content-length'] || size || 0, h = crypto.createHash('sha256'), f = fs.createWriteStream(dest);
+      let got = 0, last = -1;
+      rs.on('data', (c) => { got += c.length; h.update(c); if (total) { const p = Math.min(99, Math.floor(got * 100 / total)); if (p !== last) { last = p; onPct(p); } } });
+      rs.on('error', rej); f.on('error', rej);
+      rs.pipe(f);
+      f.on('finish', () => res({ sha: h.digest('hex'), got }));
+    });
+    rq.on('timeout', () => rq.destroy(new Error('timeout'))); rq.on('error', rej);
+  });
+}
+async function fetchUpdate(a) {
+  const dir = path.join(os.tmpdir(), 'gatito-update'), dest = path.join(dir, a.name);
+  try {
+    fs.rmSync(dir, { recursive: true, force: true }); fs.mkdirSync(dir, { recursive: true });
+    const r = await download(a.url, dest, a.size, 0, (p) => { UP.pct = p; });
+    if ((a.size && r.got !== a.size) || (a.sha && r.sha !== a.sha)) throw new Error('berkas tidak cocok');
+    UP.pct = 100; UP.state = 'ready';
+    if (!H.applyUpdate || !H.applyUpdate(dest)) throw new Error('tidak bisa dipasang');
+  } catch (e) { UP.state = 'error'; try { fs.rmSync(dir, { recursive: true, force: true }); } catch (x) {} }
 }
 const MEDIA = { volup: 175, voldown: 174, mute: 173, playpause: 179, next: 176, prev: 177 };
 const q = (s) => String(s).replace(/'/g, "''");
@@ -216,10 +248,20 @@ function start(file, port, hooks) {
       try { res.writeHead(200, Object.assign({ 'Content-Type': 'image/' + (im[2] === 'jpg' ? 'jpeg' : im[2]), 'Cache-Control': 'max-age=31536000' }, cors)); return res.end(fs.readFileSync(path.join(imgDir, im[1]))); }
       catch (e) { return send(404, 'text/plain', ''); }
     }
-    if (p === '/') return send(200, 'text/html; charset=utf-8', fs.readFileSync(path.join(__dirname, 'mobile', 'www', 'index.html'), 'utf8').replace(/__VERSION__/g, String(APPV.version || '')));
+    if (p === '/') return send(200, 'text/html; charset=utf-8', fs.readFileSync(path.join(__dirname, 'mobile', 'www', 'index.html'), 'utf8').replace(/__VERSION__/g, String(APPV.version || '')).replace(/__REPO__/g, String(APPV.updateRepo || '')));
     if (local && p === '/appinfo') return json({ version: APPV.version || '' });
     if (local && p === '/obs-logo.png') { try { return send(200, 'image/png', fs.readFileSync(path.join(__dirname, 'assets', 'obs-logo.png'))); } catch (e) { return send(404, 'text/plain', ''); } }
-    if (local && req.method === 'POST' && p === '/update/check') return checkUpdate().then(json);
+    if (local && req.method === 'POST' && p === '/update/check') return checkUpdate().then(({ _a, ...r }) => json(r));
+    if (local && p === '/update/status') return json(UP);
+    if (local && req.method === 'POST' && p === '/update/install') {
+      if (!sameOrigin(req)) return send(403, 'text/plain', 'forbidden');
+      if (UP.state === 'down' || UP.state === 'ready') return json(UP);
+      return checkUpdate().then((r) => {
+        if (r.state !== 'new' || !r._a) { UP.state = 'error'; return json(UP); }
+        UP.state = 'down'; UP.pct = 0; fetchUpdate(r._a);
+        json(UP);
+      });
+    }
     if (local && req.method === 'POST' && p === '/update/open') {
       if (!sameOrigin(req)) return send(403, 'text/plain', 'forbidden');
       let b = '';
